@@ -73,12 +73,14 @@ function Home() {
           aria-hidden
           width={1920}
           height={1280}
-          className="h-full w-full object-cover opacity-70"
+          className="h-full w-full object-cover opacity-80"
         />
         <div className="absolute inset-0 vignette" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
+        <div className="absolute inset-0 smoke pointer-events-none" />
+        <div className="absolute inset-0 spotlight pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/65 to-background" />
       </div>
-      <DustParticles count={50} />
+      <DustParticles count={55} />
 
       <header className="relative z-10 px-6 md:px-12 pt-8 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
