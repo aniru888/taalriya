@@ -19,7 +19,9 @@ function emit() {
 
 export function subscribeLibrary(cb: () => void) {
   listeners.add(cb);
-  return () => listeners.delete(cb);
+  return () => {
+    listeners.delete(cb);
+  };
 }
 
 export function getLibrary(): BolMeta[] {
