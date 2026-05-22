@@ -4,8 +4,11 @@ import tablasHero from "@/assets/tablas-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 import { TaalPlayer } from "@/components/TaalPlayer";
 import { CustomTaalCreator } from "@/components/CustomTaalCreator";
-import { SoundManager } from "@/components/SoundManager";
+import { SoundLibrary } from "@/components/SoundLibrary";
+import { playByName, subscribeLibrary, getLibrary, findByName } from "@/lib/tabla-audio";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
+import { useEffect } from "react";
+import type { Step } from "@/components/TaalPlayer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,6 +46,23 @@ function Home() {
     () => activeTaal.divisions.split("+").map((s) => parseInt(s.trim(), 10)),
     [activeTaal],
   );
+
+  // Re-render when library changes so preset step labels reflect availability
+  const [, force] = useState(0);
+  useEffect(() => subscribeLibrary(() => force((n) => n + 1)), []);
+
+  const presetSteps: Step[] = activeTaal[variation].map((name) => {
+    const has = Boolean(findByName(name));
+    return {
+      label: name,
+      play: has ? (t, v) => playByName(name, t, v) : null,
+    };
+  });
+  const missing = activeTaal[variation].filter(
+    (n) => n !== "-" && !findByName(n),
+  );
+  const uniqueMissing = Array.from(new Set(missing));
+  const libCount = getLibrary().length;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
@@ -159,8 +179,25 @@ function Home() {
               })}
             </div>
 
+            {libCount > 0 && uniqueMissing.length > 0 && (
+              <div className="mb-4 rounded-xl border border-border bg-[color:var(--card)]/60 p-3 text-xs text-muted-foreground">
+                No bol named{" "}
+                <span className="text-foreground font-display">
+                  {uniqueMissing.slice(0, 4).join(", ")}
+                  {uniqueMissing.length > 4 ? "…" : ""}
+                </span>{" "}
+                in your library — those beats will stay silent. Open Sounds to upload them.
+              </div>
+            )}
+            {libCount === 0 && (
+              <div className="mb-4 rounded-xl border border-[color:var(--gold)]/30 bg-[color:var(--accent)]/40 p-3 text-xs text-foreground">
+                Your sound library is empty. Open the <span className="text-gold">Sounds</span> tab
+                to upload your tabla recordings, then come back to practice.
+              </div>
+            )}
+
             <TaalPlayer
-              bols={activeTaal[variation]}
+              steps={presetSteps}
               title={`${activeTaal.name} — ${VARIATION_LABELS[variation]}`}
               subtitle={`${activeTaal.beats} beat cycle · ${activeTaal.divisions}`}
               divisions={divisions}
@@ -169,8 +206,9 @@ function Home() {
         )}
 
         {view === "custom" && <CustomTaalCreator />}
-        {view === "sounds" && <SoundManager />}
+        {view === "sounds" && <SoundLibrary />}
       </div>
+
 
       <footer className="relative z-10 px-6 pb-8 text-center text-xs text-muted-foreground/70">
         Crafted for riyaaz · Your own tabla, in perfect taal.

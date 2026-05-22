@@ -1,52 +1,31 @@
 import * as Tone from "tone";
-import { getSample, listSampleKeys, putSample, deleteSample } from "./sample-store";
-
-// Bols the app cares about by default. Users may upload more if they wish.
-export const REQUIRED_BOLS = ["Dha", "Dhin", "Na", "Tin", "Ta", "Ghe"] as const;
-
-export const BOL_LIBRARY: { name: string; label: string; tone: "bass" | "treble" | "combo" }[] = [
-  { name: "Dha", label: "Dha", tone: "combo" },
-  { name: "Dhin", label: "Dhin", tone: "combo" },
-  { name: "Ghe", label: "Ghe", tone: "bass" },
-  { name: "Ke", label: "Ke", tone: "bass" },
-  { name: "Na", label: "Na", tone: "treble" },
-  { name: "Ta", label: "Ta", tone: "treble" },
-  { name: "Tin", label: "Tin", tone: "treble" },
-  { name: "Tu", label: "Tu", tone: "treble" },
-  { name: "Te", label: "Te", tone: "treble" },
-  { name: "Ra", label: "Ra", tone: "treble" },
-  { name: "Tirakita", label: "Tirakita", tone: "combo" },
-  { name: "-", label: "Rest", tone: "treble" },
-];
-
-// Aliases let taal definitions reuse a single uploaded sample.
-const ALIASES: Record<string, string> = {
-  ge: "ghe",
-  ga: "ghe",
-  ki: "ke",
-  kat: "ke",
-  dhe: "dha",
-  dhet: "dha",
-  ti: "te",
-  tun: "tu",
-};
-
-const norm = (b: string) => {
-  const k = (b || "").trim().toLowerCase();
-  return ALIASES[k] ?? k;
-};
+import {
+  type BolMeta,
+  getBlob,
+  listMeta,
+  putBol,
+  removeBol,
+  renameBol,
+} from "./sample-store";
 
 let masterGain: GainNode | null = null;
-const buffers = new Map<string, AudioBuffer>();
+const buffers = new Map<string, AudioBuffer>(); // id -> buffer
+let metaCache: BolMeta[] = [];
 const listeners = new Set<() => void>();
 
 function emit() {
   for (const l of listeners) l();
 }
 
-export function subscribeSamples(cb: () => void) {
+export function subscribeLibrary(cb: () => void) {
   listeners.add(cb);
-  return () => listeners.delete(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+export function getLibrary(): BolMeta[] {
+  return metaCache;
 }
 
 export async function startAudio() {
@@ -57,8 +36,7 @@ export async function startAudio() {
     masterGain.gain.value = 0.95;
     masterGain.connect(ctx.destination);
   }
-  // Lazy-load any samples we haven't decoded yet.
-  await hydrateBuffers();
+  await hydrate();
 }
 
 async function decodeBlob(blob: Blob): Promise<AudioBuffer> {
@@ -67,85 +45,87 @@ async function decodeBlob(blob: Blob): Promise<AudioBuffer> {
   return await ctx.decodeAudioData(arr.slice(0));
 }
 
-async function hydrateBuffers() {
-  const keys = await listSampleKeys();
+async function hydrate() {
+  metaCache = await listMeta();
   await Promise.all(
-    keys.map(async (k) => {
-      if (buffers.has(k)) return;
-      const blob = await getSample(k);
+    metaCache.map(async (m) => {
+      if (buffers.has(m.id)) return;
+      const blob = await getBlob(m.id);
       if (!blob) return;
       try {
-        buffers.set(k, await decodeBlob(blob));
+        buffers.set(m.id, await decodeBlob(blob));
       } catch (e) {
-        console.warn("Failed to decode sample for", k, e);
+        console.warn("Decode failed", m.name, e);
       }
     }),
   );
+  emit();
 }
 
-export async function uploadSample(bol: string, file: File) {
-  const k = norm(bol);
-  await putSample(k, file);
-  // re-decode
+export async function addBol(name: string, file: File): Promise<BolMeta> {
+  await startAudio();
+  const meta: BolMeta = {
+    id: crypto.randomUUID(),
+    name: name.trim() || "Untitled",
+    createdAt: Date.now(),
+  };
   try {
     const buf = await decodeBlob(file);
-    buffers.set(k, buf);
-  } catch (e) {
-    console.error("Decode failed", e);
-    throw new Error("Could not decode audio file. Try MP3 or WAV.");
+    buffers.set(meta.id, buf);
+  } catch {
+    throw new Error("Could not decode audio. Try MP3 or WAV.");
   }
+  await putBol(meta, file);
+  metaCache = await listMeta();
+  emit();
+  return meta;
+}
+
+export async function rename(id: string, name: string) {
+  await renameBol(id, name.trim() || "Untitled");
+  metaCache = await listMeta();
   emit();
 }
 
-export async function removeSample(bol: string) {
-  const k = norm(bol);
-  await deleteSample(k);
-  buffers.delete(k);
+export async function remove(id: string) {
+  await removeBol(id);
+  buffers.delete(id);
+  metaCache = await listMeta();
   emit();
 }
 
-export function hasSample(bol: string) {
-  return buffers.has(norm(bol));
+export function findByName(name: string): BolMeta | undefined {
+  const n = (name || "").trim().toLowerCase();
+  if (!n) return undefined;
+  return metaCache.find((m) => m.name.trim().toLowerCase() === n);
 }
 
-export async function loadedSampleKeys(): Promise<string[]> {
-  await hydrateBuffers();
-  return Array.from(buffers.keys());
-}
-
-/** Schedule (or fire now) a single bol via Web Audio for sample-accurate timing. */
-export function playBol(bolRaw: string, time?: number, velocity = 1) {
-  const b = (bolRaw || "").trim().toLowerCase();
-  if (!b || b === "-" || b === "x" || b === "s") return;
-
-  // Tirakita = 4-stroke micro-roll inside one beat using available samples.
-  if (b === "tirakita" || b === "tirikita") {
-    const ctx = Tone.getContext().rawContext as AudioContext;
-    const t0 = time ?? ctx.currentTime;
-    const step = 60 / Tone.getTransport().bpm.value / 4; // one 16th
-    const roll = ["te", "ke", "te", "na"];
-    roll.forEach((x, i) => fireOne(x, t0 + i * step, velocity * 0.85));
-    return;
-  }
-
-  fireOne(b, time, velocity);
-}
-
-function fireOne(bolKey: string, time: number | undefined, velocity: number) {
+function fireBuffer(buf: AudioBuffer, time: number | undefined, velocity: number) {
   const ctx = Tone.getContext().rawContext as AudioContext;
   if (!masterGain) {
     masterGain = ctx.createGain();
     masterGain.gain.value = 0.95;
     masterGain.connect(ctx.destination);
   }
-  const buf = buffers.get(norm(bolKey));
-  if (!buf) return; // no sample uploaded — stay silent
   const src = ctx.createBufferSource();
   src.buffer = buf;
   const g = ctx.createGain();
   g.gain.value = Math.max(0, Math.min(1.5, velocity));
   src.connect(g).connect(masterGain);
   src.start(time ?? ctx.currentTime);
+}
+
+export function playById(id: string | null | undefined, time?: number, velocity = 1) {
+  if (!id) return;
+  const buf = buffers.get(id);
+  if (!buf) return;
+  fireBuffer(buf, time, velocity);
+}
+
+export function playByName(name: string, time?: number, velocity = 1) {
+  const m = findByName(name);
+  if (!m) return;
+  playById(m.id, time, velocity);
 }
 
 export function setMasterVolume(v: number) {
