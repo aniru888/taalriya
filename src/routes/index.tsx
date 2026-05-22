@@ -4,8 +4,11 @@ import tablasHero from "@/assets/tablas-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 import { TaalPlayer } from "@/components/TaalPlayer";
 import { CustomTaalCreator } from "@/components/CustomTaalCreator";
-import { SoundManager } from "@/components/SoundManager";
+import { SoundLibrary } from "@/components/SoundLibrary";
+import { playByName, subscribeLibrary, getLibrary, findByName } from "@/lib/tabla-audio";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
+import { useEffect } from "react";
+import type { Step } from "@/components/TaalPlayer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
