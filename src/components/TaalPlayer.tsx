@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as Tone from "tone";
 import { Play, Pause, Square, Repeat, Volume2 } from "lucide-react";
-import { playBol, startAudio, setMasterVolume } from "@/lib/tabla-audio";
+import { setMasterVolume, startAudio } from "@/lib/tabla-audio";
 
-interface Props {
-  bols: string[];
-  title?: string;
-  subtitle?: string;
-  divisions?: number[]; // optional bar divisions (cumulative beat indices)
+export interface Step {
+  label: string;
+  play: ((time: number, velocity?: number) => void) | null; // null = rest
 }
 
-export function TaalPlayer({ bols, title, subtitle, divisions }: Props) {
+interface Props {
+  steps: Step[];
+  title?: string;
+  subtitle?: string;
+  divisions?: number[];
+}
+
+export function TaalPlayer({ steps, title, subtitle, divisions }: Props) {
   const [bpm, setBpm] = useState(80);
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
@@ -18,16 +23,14 @@ export function TaalPlayer({ bols, title, subtitle, divisions }: Props) {
   const [volume, setVolume] = useState(0.9);
 
   const seqRef = useRef<Tone.Sequence | null>(null);
-  const bolsRef = useRef(bols);
-  bolsRef.current = bols;
+  const stepsRef = useRef(steps);
+  stepsRef.current = steps;
 
   useEffect(() => {
     Tone.getTransport().bpm.rampTo(bpm, 0.1);
   }, [bpm]);
 
-  useEffect(() => {
-    setMasterVolume(volume);
-  }, [volume]);
+  useEffect(() => setMasterVolume(volume), [volume]);
 
   const stop = useCallback(() => {
     Tone.getTransport().stop();
@@ -41,15 +44,16 @@ export function TaalPlayer({ bols, title, subtitle, divisions }: Props) {
   const start = useCallback(async () => {
     await startAudio();
     stop();
+    if (stepsRef.current.length === 0) return;
     Tone.getTransport().bpm.value = bpm;
 
-    const indices = bolsRef.current.map((_, i) => i);
+    const indices = stepsRef.current.map((_, i) => i);
     const seq = new Tone.Sequence(
       (time, idx: number) => {
-        const bol = bolsRef.current[idx];
-        playBol(bol, time);
+        const s = stepsRef.current[idx];
+        s?.play?.(time);
         Tone.getDraw().schedule(() => setCurrentBeat(idx), time);
-        if (!loop && idx === bolsRef.current.length - 1) {
+        if (!loop && idx === stepsRef.current.length - 1) {
           Tone.getDraw().schedule(() => {
             setTimeout(() => stop(), 60);
           }, time + Tone.Time("4n").toSeconds());
@@ -78,17 +82,15 @@ export function TaalPlayer({ bols, title, subtitle, divisions }: Props) {
 
   useEffect(() => () => stop(), [stop]);
 
-  // Reset beat when bols change
+  // when length or composition fingerprint changes, restart if playing
+  const fingerprint = steps.map((s) => s.label).join("|");
   useEffect(() => {
     setCurrentBeat(-1);
-    if (playing) {
-      // restart with new bols
-      start();
-    }
+    if (playing) start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bols.join("|")]);
+  }, [fingerprint]);
 
-  const isDivisionStart = useMemo(() => {
+  const divisionStarts = (() => {
     const set = new Set<number>([0]);
     if (divisions) {
       let cum = 0;
@@ -98,7 +100,7 @@ export function TaalPlayer({ bols, title, subtitle, divisions }: Props) {
       }
     }
     return set;
-  }, [divisions]);
+  })();
 
   return (
     <div className="glass rounded-2xl p-5 md:p-7">
@@ -109,17 +111,21 @@ export function TaalPlayer({ bols, title, subtitle, divisions }: Props) {
         </div>
       )}
 
-      {/* Beat grid */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {bols.map((bol, i) => {
+        {steps.length === 0 && (
+          <div className="w-full rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            Empty taal — add bols to begin.
+          </div>
+        )}
+        {steps.map((s, i) => {
           const active = i === currentBeat;
-          const isStart = isDivisionStart.has(i);
-          const isRest = !bol || bol === "-";
+          const isStart = divisionStarts.has(i);
+          const isRest = !s.play;
           return (
             <div
               key={i}
               className={[
-                "relative min-w-[58px] md:min-w-[68px] flex-1 max-w-[100px] aspect-[5/4] rounded-xl border flex flex-col items-center justify-center transition-all duration-150",
+                "relative min-w-[56px] md:min-w-[68px] flex-1 max-w-[100px] aspect-[5/4] rounded-xl border flex flex-col items-center justify-center transition-all duration-150",
                 active
                   ? "border-[color:var(--gold)] glow-gold bg-[color:var(--accent)] animate-beat"
                   : "border-border bg-[color:var(--card)]",
@@ -131,19 +137,18 @@ export function TaalPlayer({ bols, title, subtitle, divisions }: Props) {
               </span>
               <span
                 className={[
-                  "font-display text-lg md:text-xl",
+                  "font-display text-sm md:text-base px-1 text-center break-words leading-tight",
                   isRest ? "text-muted-foreground/40" : "text-foreground",
                   active ? "text-gold" : "",
                 ].join(" ")}
               >
-                {isRest ? "·" : bol}
+                {isRest ? "·" : s.label}
               </span>
             </div>
           );
         })}
       </div>
 
-      {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
         {!playing ? (
           <button
