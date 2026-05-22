@@ -4,6 +4,7 @@ import tablasHero from "@/assets/tablas-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 import { TaalPlayer } from "@/components/TaalPlayer";
 import { CustomTaalCreator } from "@/components/CustomTaalCreator";
+import { SoundManager } from "@/components/SoundManager";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
 
 export const Route = createFileRoute("/")({
@@ -13,17 +14,25 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "A cinematic tabla practice studio for Indian classical singing. Practice Dadra, Keharwa, Teen Taal, Rupak and Ektaal with theka, fast and tehai variations, plus a custom taal creator.",
+          "A cinematic tabla practice studio for Indian classical singing. Upload your own tabla samples and practice Dadra, Keharwa, Teen Taal, Rupak and Ektaal with theka, fast and tehai variations.",
       },
     ],
   }),
   component: Home,
 });
 
+type View = "taals" | "custom" | "sounds";
+
+const VIEWS: { id: View; label: string }[] = [
+  { id: "taals", label: "Practice" },
+  { id: "custom", label: "Custom Taal" },
+  { id: "sounds", label: "Sounds" },
+];
+
 function Home() {
   const [activeTaalId, setActiveTaalId] = useState(TAALS[2].id);
   const [variation, setVariation] = useState<VariationKey>("theka");
-  const [customOpen, setCustomOpen] = useState(false);
+  const [view, setView] = useState<View>("taals");
 
   const activeTaal = useMemo(
     () => TAALS.find((t) => t.id === activeTaalId)!,
@@ -37,7 +46,6 @@ function Home() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      {/* Hero background */}
       <div className="absolute inset-0 -z-10">
         <img
           src={tablasHero}
@@ -52,8 +60,7 @@ function Home() {
       </div>
       <DustParticles count={50} />
 
-      {/* Header */}
-      <header className="relative z-10 px-6 md:px-12 pt-8 flex items-center justify-between">
+      <header className="relative z-10 px-6 md:px-12 pt-8 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-full border border-[color:var(--gold)]/40 glow-gold flex items-center justify-center">
             <span className="font-display text-gold text-lg">ॐ</span>
@@ -65,29 +72,43 @@ function Home() {
             </div>
           </div>
         </div>
-        <button
-          onClick={() => setCustomOpen((v) => !v)}
-          className="hidden sm:inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:border-[color:var(--gold)]/60 transition"
-        >
-          {customOpen ? "Back to Taals" : "Custom Taal"}
-        </button>
+        <nav className="glass rounded-full p-1 flex items-center gap-1">
+          {VIEWS.map((v) => {
+            const active = v.id === view;
+            return (
+              <button
+                key={v.id}
+                onClick={() => setView(v.id)}
+                className={[
+                  "rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition",
+                  active
+                    ? "bg-[color:var(--gold)] text-[color:var(--primary-foreground)]"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </nav>
       </header>
 
-      {/* Hero */}
-      <section className="relative z-10 px-6 md:px-12 pt-16 pb-12 text-center max-w-4xl mx-auto">
-        <h1 className="font-display text-5xl md:text-7xl leading-[1.05] text-gold animate-fade-up">
+      <section className="relative z-10 px-6 md:px-12 pt-12 md:pt-16 pb-10 text-center max-w-4xl mx-auto">
+        <h1 className="font-display text-4xl sm:text-5xl md:text-7xl leading-[1.05] text-gold animate-fade-up">
           The rhythm of riyaaz,<br className="hidden md:block" /> in your hands.
         </h1>
-        <p className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto animate-fade-up" style={{ animationDelay: "0.1s" }}>
-          A cinematic practice companion for Indian classical singers. Stay in taal with realistic
-          tabla bols, every variation a guru would teach.
+        <p
+          className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto animate-fade-up"
+          style={{ animationDelay: "0.1s" }}
+        >
+          A cinematic practice companion for Indian classical singers. Upload your own tabla
+          recordings and stay in taal — every bol, your own.
         </p>
       </section>
 
       <div className="relative z-10 px-4 md:px-12 pb-24 max-w-6xl mx-auto">
-        {!customOpen ? (
+        {view === "taals" && (
           <>
-            {/* Taal selector */}
             <div className="flex flex-wrap justify-center gap-2 mb-6">
               {TAALS.map((t) => {
                 const active = t.id === activeTaalId;
@@ -112,13 +133,12 @@ function Home() {
               })}
             </div>
 
-            <div className="text-center text-xs text-muted-foreground mb-6">
+            <div className="text-center text-xs text-muted-foreground mb-6 px-4">
               <span className="font-display text-base text-foreground/80">{activeTaal.name}</span>
               {" · "}
               {activeTaal.beats} beats ({activeTaal.divisions}) · {activeTaal.description}
             </div>
 
-            {/* Variation tabs */}
             <div className="flex flex-wrap justify-center gap-2 mb-6">
               {VARIATION_KEYS.map((key) => {
                 const active = key === variation;
@@ -145,23 +165,15 @@ function Home() {
               subtitle={`${activeTaal.beats} beat cycle · ${activeTaal.divisions}`}
               divisions={divisions}
             />
-
-            <div className="mt-10 text-center sm:hidden">
-              <button
-                onClick={() => setCustomOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm hover:border-[color:var(--gold)]/60 transition"
-              >
-                Create Custom Taal
-              </button>
-            </div>
           </>
-        ) : (
-          <CustomTaalCreator />
         )}
+
+        {view === "custom" && <CustomTaalCreator />}
+        {view === "sounds" && <SoundManager />}
       </div>
 
       <footer className="relative z-10 px-6 pb-8 text-center text-xs text-muted-foreground/70">
-        Crafted for riyaaz · Tabla bols synthesized live · Stay in taal.
+        Crafted for riyaaz · Your own tabla, in perfect taal.
       </footer>
     </main>
   );
