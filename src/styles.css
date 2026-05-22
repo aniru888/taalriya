@@ -98,6 +98,27 @@
       radial-gradient(ellipse at center, transparent 30%, oklch(0.05 0 0 / 0.85) 100%),
       radial-gradient(ellipse at 50% 80%, oklch(0.15 0.04 60 / 0.5) 0%, transparent 60%);
   }
+  .spotlight {
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 18%,
+        color-mix(in oklab, var(--gold-glow) 22%, transparent) 0%,
+        color-mix(in oklab, var(--gold) 8%, transparent) 35%,
+        transparent 70%);
+    mix-blend-mode: screen;
+  }
+  .smoke {
+    background:
+      radial-gradient(ellipse 40% 30% at 30% 60%, oklch(0.9 0.02 80 / 0.05), transparent 70%),
+      radial-gradient(ellipse 50% 35% at 70% 75%, oklch(0.9 0.02 80 / 0.04), transparent 70%);
+    filter: blur(20px);
+    animation: smoke-drift 24s ease-in-out infinite alternate;
+    mix-blend-mode: screen;
+  }
+  @keyframes smoke-drift {
+    0%   { transform: translate3d(-2%, 1%, 0) scale(1); opacity: 0.7; }
+    50%  { transform: translate3d(2%, -1%, 0) scale(1.05); opacity: 1; }
+    100% { transform: translate3d(-1%, 2%, 0) scale(1.02); opacity: 0.8; }
+  }
   @keyframes beat-pulse {
     0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in oklab, var(--gold-glow) 70%, transparent); }
     50% { transform: scale(1.18); }
