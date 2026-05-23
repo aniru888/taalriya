@@ -25,7 +25,8 @@ export function TaalPlayer({
   steps, title, subtitle, divisions,
   sam = 1, khali = [], taalId, isFavorite, onToggleFavorite,
 }: Props) {
-  const initial = loadSettings();
+  const initialRef = useRef(loadSettings());
+  const initial = initialRef.current;
   const [bpm, setBpm] = useState(initial.bpm);
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
