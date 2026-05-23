@@ -13,6 +13,9 @@ const buffers = new Map<string, AudioBuffer>(); // id -> buffer
 let metaCache: BolMeta[] = [];
 const listeners = new Set<() => void>();
 
+// Global tabla pitch shift in semitones (relative to recording).
+let tablaSemitones = 0;
+
 function emit() {
   for (const l of listeners) l();
 }
@@ -26,6 +29,14 @@ export function subscribeLibrary(cb: () => void) {
 
 export function getLibrary(): BolMeta[] {
   return metaCache;
+}
+
+export function setTablaSemitones(n: number) {
+  tablaSemitones = Math.max(-12, Math.min(12, n));
+}
+
+export function getTablaSemitones() {
+  return tablaSemitones;
 }
 
 export async function startAudio() {
@@ -109,6 +120,8 @@ function fireBuffer(buf: AudioBuffer, time: number | undefined, velocity: number
   }
   const src = ctx.createBufferSource();
   src.buffer = buf;
+  // Apply global pitch shift via playbackRate (preserves natural texture).
+  src.playbackRate.value = Math.pow(2, tablaSemitones / 12);
   const g = ctx.createGain();
   g.gain.value = Math.max(0, Math.min(1.5, velocity));
   src.connect(g).connect(masterGain);
