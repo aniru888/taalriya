@@ -1,13 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import tablasHero from "@/assets/tablas-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 import { TaalPlayer } from "@/components/TaalPlayer";
 import { CustomTaalCreator } from "@/components/CustomTaalCreator";
 import { SoundLibrary } from "@/components/SoundLibrary";
-import { playByName, subscribeLibrary, getLibrary, findByName } from "@/lib/tabla-audio";
+import { TanpuraPanel } from "@/components/TanpuraPanel";
+import {
+  playByName, subscribeLibrary, getLibrary, findByName,
+  setTablaSemitones, getTablaSemitones,
+} from "@/lib/tabla-audio";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
-import { useEffect } from "react";
+import { type Scale, setTanpuraVolume } from "@/lib/tanpura";
+import { loadSettings, saveSettings } from "@/lib/settings";
 import type { Step } from "@/components/TaalPlayer";
 
 export const Route = createFileRoute("/")({
@@ -17,28 +22,53 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "A cinematic tabla practice studio for Indian classical singing. Upload your own tabla samples and practice Dadra, Keharwa, Teen Taal, Rupak and Ektaal with theka, fast and tehai variations.",
+          "A cinematic tabla practice studio for Indian classical singing. Upload your own tabla samples and tanpura loops, train with gradual BPM, and practice Dadra, Keharwa, Teen Taal, Rupak and Ektaal.",
       },
     ],
   }),
   component: Home,
 });
 
-type View = "taals" | "custom" | "sounds";
+type View = "taals" | "custom" | "sounds" | "tanpura";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "taals", label: "Practice" },
+  { id: "tanpura", label: "Tanpura" },
   { id: "custom", label: "Custom Taal" },
   { id: "sounds", label: "Sounds" },
 ];
 
 function Home() {
-  const [activeTaalId, setActiveTaalId] = useState(TAALS[2].id);
-  const [variation, setVariation] = useState<VariationKey>("theka");
+  const initial = useMemo(() => loadSettings(), []);
+  const [activeTaalId, setActiveTaalId] = useState(initial.taalId);
+  const [variation, setVariation] = useState<VariationKey>(
+    (VARIATION_KEYS as readonly string[]).includes(initial.variation)
+      ? (initial.variation as VariationKey)
+      : "theka",
+  );
   const [view, setView] = useState<View>("taals");
+  const [favorites, setFavorites] = useState<string[]>(initial.favorites);
+  const [tablaST, setTablaST] = useState(initial.tablaSemitones);
+  const [tanpuraScale, setTanpuraScale] = useState<Scale>(initial.tanpuraScale as Scale);
+
+  // Hydrate audio engine with saved settings on mount
+  useEffect(() => {
+    setTablaSemitones(initial.tablaSemitones);
+    setTanpuraVolume(initial.tanpuraVolume);
+  }, [initial.tablaSemitones, initial.tanpuraVolume]);
+
+  // Persist when these change
+  useEffect(() => { saveSettings({ taalId: activeTaalId }); }, [activeTaalId]);
+  useEffect(() => { saveSettings({ variation }); }, [variation]);
+  useEffect(() => { saveSettings({ favorites }); }, [favorites]);
+  useEffect(() => {
+    setTablaSemitones(tablaST);
+    saveSettings({ tablaSemitones: tablaST });
+  }, [tablaST]);
+  useEffect(() => { saveSettings({ tanpuraScale }); }, [tanpuraScale]);
 
   const activeTaal = useMemo(
-    () => TAALS.find((t) => t.id === activeTaalId)!,
+    () => TAALS.find((t) => t.id === activeTaalId) ?? TAALS[2],
     [activeTaalId],
   );
 
@@ -47,7 +77,6 @@ function Home() {
     [activeTaal],
   );
 
-  // Re-render when library changes so preset step labels reflect availability
   const [, force] = useState(0);
   useEffect(() => subscribeLibrary(() => force((n) => n + 1)), []);
 
@@ -58,21 +87,19 @@ function Home() {
       play: has ? (t, v) => playByName(name, t, v) : null,
     };
   });
-  const missing = activeTaal[variation].filter(
-    (n) => n !== "-" && !findByName(n),
-  );
+  const missing = activeTaal[variation].filter((n) => n !== "-" && !findByName(n));
   const uniqueMissing = Array.from(new Set(missing));
   const libCount = getLibrary().length;
+
+  const isFav = favorites.includes(activeTaal.id);
+  const toggleFav = () =>
+    setFavorites((f) => (f.includes(activeTaal.id) ? f.filter((x) => x !== activeTaal.id) : [...f, activeTaal.id]));
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <div className="absolute inset-0 -z-10">
         <img
-          src={tablasHero}
-          alt=""
-          aria-hidden
-          width={1920}
-          height={1280}
+          src={tablasHero} alt="" aria-hidden width={1920} height={1280}
           className="h-full w-full object-cover opacity-80"
         />
         <div className="absolute inset-0 vignette" />
@@ -82,19 +109,19 @@ function Home() {
       </div>
       <DustParticles count={55} />
 
-      <header className="relative z-10 px-6 md:px-12 pt-8 flex items-center justify-between gap-4 flex-wrap">
+      <header className="relative z-10 px-4 sm:px-6 md:px-12 pt-6 sm:pt-8 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-full border border-[color:var(--gold)]/40 glow-gold flex items-center justify-center">
             <span className="font-display text-gold text-lg">ॐ</span>
           </div>
           <div>
             <div className="font-display text-xl text-gold leading-none">Taalriya</div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Classical Riyaaz Studio
             </div>
           </div>
         </div>
-        <nav className="glass rounded-full p-1 flex items-center gap-1">
+        <nav className="glass rounded-full p-1 flex items-center gap-1 overflow-x-auto max-w-full">
           {VIEWS.map((v) => {
             const active = v.id === view;
             return (
@@ -102,7 +129,7 @@ function Home() {
                 key={v.id}
                 onClick={() => setView(v.id)}
                 className={[
-                  "rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition",
+                  "rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition whitespace-nowrap",
                   active
                     ? "bg-[color:var(--gold)] text-[color:var(--primary-foreground)]"
                     : "text-muted-foreground hover:text-foreground",
@@ -115,34 +142,50 @@ function Home() {
         </nav>
       </header>
 
-      <section className="relative z-10 px-6 md:px-12 pt-12 md:pt-16 pb-10 text-center max-w-4xl mx-auto">
-        <h1 className="font-display text-4xl sm:text-5xl md:text-7xl leading-[1.05] text-gold animate-fade-up">
+      <section className="relative z-10 px-4 sm:px-6 md:px-12 pt-10 md:pt-16 pb-8 text-center max-w-4xl mx-auto">
+        <h1 className="font-display text-3xl sm:text-5xl md:text-7xl leading-[1.05] text-gold animate-fade-up">
           The rhythm of riyaaz,<br className="hidden md:block" /> in your hands.
         </h1>
         <p
-          className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto animate-fade-up"
+          className="mt-4 sm:mt-5 text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto animate-fade-up"
           style={{ animationDelay: "0.1s" }}
         >
-          A cinematic practice companion for Indian classical singers. Upload your own tabla
-          recordings and stay in taal — every bol, your own.
+          Your tabla, your tanpura, your scale. A cinematic riyaaz companion for Indian
+          classical singers — every bol, your own.
         </p>
       </section>
 
-      <div className="relative z-10 px-4 md:px-12 pb-24 max-w-6xl mx-auto">
+      <div className="relative z-10 px-3 sm:px-4 md:px-12 pb-24 max-w-6xl mx-auto">
         {view === "taals" && (
           <>
-            <div className="flex flex-wrap justify-center gap-2 mb-6">
+            {favorites.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 justify-center">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Favorites</span>
+                {favorites.map((id) => {
+                  const t = TAALS.find((x) => x.id === id);
+                  if (!t) return null;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => { setActiveTaalId(id); setVariation("theka"); }}
+                      className="rounded-full px-3 py-1 text-xs border border-[color:var(--gold)]/40 text-gold bg-[color:var(--accent)]/40 hover:glow-gold transition"
+                    >
+                      ★ {t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-center gap-2 mb-5">
               {TAALS.map((t) => {
                 const active = t.id === activeTaalId;
                 return (
                   <button
                     key={t.id}
-                    onClick={() => {
-                      setActiveTaalId(t.id);
-                      setVariation("theka");
-                    }}
+                    onClick={() => { setActiveTaalId(t.id); setVariation("theka"); }}
                     className={[
-                      "rounded-full px-4 py-2 text-sm border transition",
+                      "rounded-full px-3 sm:px-4 py-2 text-xs sm:text-sm border transition",
                       active
                         ? "border-[color:var(--gold)] text-gold bg-[color:var(--accent)] glow-gold"
                         : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40",
@@ -155,13 +198,12 @@ function Home() {
               })}
             </div>
 
-            <div className="text-center text-xs text-muted-foreground mb-6 px-4">
-              <span className="font-display text-base text-foreground/80">{activeTaal.name}</span>
-              {" · "}
-              {activeTaal.beats} beats ({activeTaal.divisions}) · {activeTaal.description}
+            <div className="text-center text-xs text-muted-foreground mb-5 px-4">
+              <span className="font-display text-sm sm:text-base text-foreground/80">{activeTaal.name}</span>
+              {" · "}{activeTaal.beats} beats ({activeTaal.divisions}) · {activeTaal.description}
             </div>
 
-            <div className="flex flex-wrap justify-center gap-2 mb-6">
+            <div className="flex flex-wrap justify-center gap-2 mb-4">
               {VARIATION_KEYS.map((key) => {
                 const active = key === variation;
                 return (
@@ -169,7 +211,7 @@ function Home() {
                     key={key}
                     onClick={() => setVariation(key)}
                     className={[
-                      "rounded-full px-3.5 py-1.5 text-xs uppercase tracking-wider border transition",
+                      "rounded-full px-3 py-1.5 text-[11px] sm:text-xs uppercase tracking-wider border transition",
                       active
                         ? "border-[color:var(--gold)]/70 text-gold bg-[color:var(--accent)]/70"
                         : "border-border text-muted-foreground hover:text-foreground",
@@ -179,6 +221,27 @@ function Home() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Tabla tuning */}
+            <div className="mb-5 flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
+              <span className="uppercase tracking-wider">Tabla tuning</span>
+              <input
+                type="range" min={-12} max={12} step={1} value={tablaST}
+                onChange={(e) => setTablaST(Number(e.target.value))}
+                className="w-44 accent-[color:var(--gold)]"
+              />
+              <span className="tabular-nums w-16 text-foreground">
+                {tablaST > 0 ? `+${tablaST}` : tablaST} st
+              </span>
+              {tablaST !== 0 && (
+                <button
+                  onClick={() => setTablaST(0)}
+                  className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                >
+                  reset
+                </button>
+              )}
             </div>
 
             {libCount > 0 && uniqueMissing.length > 0 && (
@@ -201,19 +264,26 @@ function Home() {
             <TaalPlayer
               steps={presetSteps}
               title={`${activeTaal.name} — ${VARIATION_LABELS[variation]}`}
-              subtitle={`${activeTaal.beats} beat cycle · ${activeTaal.divisions}`}
+              subtitle={`${activeTaal.beats} beat cycle · ${activeTaal.divisions} · Sam on ${activeTaal.sam}${activeTaal.khali.length ? `, Khali on ${activeTaal.khali.join(", ")}` : ""}`}
               divisions={divisions}
+              sam={activeTaal.sam}
+              khali={activeTaal.khali}
+              taalId={activeTaal.id}
+              isFavorite={isFav}
+              onToggleFavorite={toggleFav}
             />
           </>
         )}
 
+        {view === "tanpura" && (
+          <TanpuraPanel scale={tanpuraScale} onScaleChange={setTanpuraScale} />
+        )}
         {view === "custom" && <CustomTaalCreator />}
         {view === "sounds" && <SoundLibrary />}
       </div>
 
-
       <footer className="relative z-10 px-6 pb-8 text-center text-xs text-muted-foreground/70">
-        Crafted for riyaaz · Your own tabla, in perfect taal.
+        Space to play · ←/→ to nudge BPM · Crafted for riyaaz.
       </footer>
     </main>
   );
