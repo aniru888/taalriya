@@ -1,18 +1,22 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { Crown, Lock } from "lucide-react";
 import tablasHero from "@/assets/tablas-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 import { TaalPlayer } from "@/components/TaalPlayer";
 import { CustomTaalCreator } from "@/components/CustomTaalCreator";
 import { SoundLibrary } from "@/components/SoundLibrary";
 import { TanpuraPanel } from "@/components/TanpuraPanel";
+import { UserMenu } from "@/components/UserMenu";
 import {
   playByName, subscribeLibrary, getLibrary, findByName,
-  setTablaSemitones, getTablaSemitones,
+  setTablaSemitones,
 } from "@/lib/tabla-audio";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
 import { type Scale, setTanpuraVolume } from "@/lib/tanpura";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import { useAuth } from "@/hooks/useAuth";
+import { pullProfileIntoLocal, schedulePush, fetchProfile } from "@/lib/cloud-sync";
 import type { Step } from "@/components/TaalPlayer";
 
 export const Route = createFileRoute("/")({
