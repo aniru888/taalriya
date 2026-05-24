@@ -54,6 +54,8 @@ function Home() {
   const [favorites, setFavorites] = useState<string[]>(initial.favorites);
   const [tablaST, setTablaST] = useState(initial.tablaSemitones);
   const [tanpuraScale, setTanpuraScale] = useState<Scale>(initial.tanpuraScale as Scale);
+  const { user } = useAuth();
+  const [tier, setTier] = useState<"free" | "premium">("free");
 
   // Hydrate audio engine with saved settings on mount
   useEffect(() => {
@@ -61,15 +63,33 @@ function Home() {
     setTanpuraVolume(initial.tanpuraVolume);
   }, [initial.tablaSemitones, initial.tanpuraVolume]);
 
-  // Persist when these change
-  useEffect(() => { saveSettings({ taalId: activeTaalId }); }, [activeTaalId]);
-  useEffect(() => { saveSettings({ variation }); }, [variation]);
-  useEffect(() => { saveSettings({ favorites }); }, [favorites]);
+  // Cloud sync: pull on sign-in, push on changes (premium gates writes)
+  useEffect(() => {
+    if (!user) { setTier("free"); return; }
+    pullProfileIntoLocal().then((p) => {
+      if (!p) return;
+      setTier(p.tier);
+      const s = loadSettings();
+      setActiveTaalId(s.taalId);
+      setVariation((VARIATION_KEYS as readonly string[]).includes(s.variation) ? (s.variation as VariationKey) : "theka");
+      setFavorites(s.favorites);
+      setTablaST(s.tablaSemitones);
+      setTanpuraScale(s.tanpuraScale as Scale);
+    });
+  }, [user]);
+
+  const cloudSyncEnabled = Boolean(user) && tier === "premium";
+
+  // Persist when these change (+ push to cloud for premium users)
+  useEffect(() => { saveSettings({ taalId: activeTaalId }); if (cloudSyncEnabled) schedulePush(); }, [activeTaalId, cloudSyncEnabled]);
+  useEffect(() => { saveSettings({ variation }); if (cloudSyncEnabled) schedulePush(); }, [variation, cloudSyncEnabled]);
+  useEffect(() => { saveSettings({ favorites }); if (cloudSyncEnabled) schedulePush(); }, [favorites, cloudSyncEnabled]);
   useEffect(() => {
     setTablaSemitones(tablaST);
     saveSettings({ tablaSemitones: tablaST });
-  }, [tablaST]);
-  useEffect(() => { saveSettings({ tanpuraScale }); }, [tanpuraScale]);
+    if (cloudSyncEnabled) schedulePush();
+  }, [tablaST, cloudSyncEnabled]);
+  useEffect(() => { saveSettings({ tanpuraScale }); if (cloudSyncEnabled) schedulePush(); }, [tanpuraScale, cloudSyncEnabled]);
 
   const activeTaal = useMemo(
     () => TAALS.find((t) => t.id === activeTaalId) ?? TAALS[2],
