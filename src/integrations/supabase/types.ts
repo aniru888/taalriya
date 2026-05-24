@@ -14,7 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          favorites: string[]
+          id: string
+          settings: Json
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          total_practice_ms: number
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          favorites?: string[]
+          id: string
+          settings?: Json
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          total_practice_ms?: number
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          favorites?: string[]
+          id?: string
+          settings?: Json
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          total_practice_ms?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_taals: {
+        Row: {
+          beats: number
+          created_at: string
+          divisions: string | null
+          id: string
+          khali: number[]
+          name: string
+          sam: number
+          steps: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          beats: number
+          created_at?: string
+          divisions?: string | null
+          id?: string
+          khali?: number[]
+          name: string
+          sam?: number
+          steps: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          beats?: number
+          created_at?: string
+          divisions?: string | null
+          id?: string
+          khali?: number[]
+          name?: string
+          sam?: number
+          steps?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +100,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      subscription_tier: "free" | "premium"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +227,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      subscription_tier: ["free", "premium"],
+    },
   },
 } as const
