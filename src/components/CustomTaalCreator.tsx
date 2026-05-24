@@ -114,7 +114,11 @@ export function CustomTaalCreator({ tier = "free" }: { tier?: "free" | "premium"
   const removeCell = () => setCells((cs) => (cs.length > 1 ? cs.slice(0, -1) : cs));
   const clearAll = () => setCells((cs) => cs.map(() => ({ bolId: null })));
 
+  const FREE_LIMIT = 3;
+  const atLimit = tier === "free" && saved.length >= FREE_LIMIT;
+
   const save = () => {
+    if (atLimit) return;
     const item: SavedTaal = {
       id: crypto.randomUUID(),
       name: name.trim() || "Untitled Taal",
