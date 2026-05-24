@@ -35,9 +35,9 @@ export const Route = createFileRoute("/")({
 
 type View = "taals" | "custom" | "sounds" | "tanpura";
 
-const VIEWS: { id: View; label: string }[] = [
+const VIEWS: { id: View; label: string; premium?: boolean }[] = [
   { id: "taals", label: "Practice" },
-  { id: "tanpura", label: "Tanpura" },
+  { id: "tanpura", label: "Tanpura", premium: true },
   { id: "custom", label: "Custom Taal" },
   { id: "sounds", label: "Sounds" },
 ];
@@ -145,25 +145,30 @@ function Home() {
             </div>
           </div>
         </div>
-        <nav className="glass rounded-full p-1 flex items-center gap-1 overflow-x-auto max-w-full">
-          {VIEWS.map((v) => {
-            const active = v.id === view;
-            return (
-              <button
-                key={v.id}
-                onClick={() => setView(v.id)}
-                className={[
-                  "rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition whitespace-nowrap",
-                  active
-                    ? "bg-[color:var(--gold)] text-[color:var(--primary-foreground)]"
-                    : "text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                {v.label}
-              </button>
-            );
-          })}
-        </nav>
+        <div className="flex items-center gap-2 flex-wrap">
+          <nav className="glass rounded-full p-1 flex items-center gap-1 overflow-x-auto max-w-full">
+            {VIEWS.map((v) => {
+              const active = v.id === view;
+              const locked = v.premium && tier !== "premium";
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => setView(v.id)}
+                  className={[
+                    "rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition whitespace-nowrap inline-flex items-center gap-1",
+                    active
+                      ? "bg-[color:var(--gold)] text-[color:var(--primary-foreground)]"
+                      : "text-muted-foreground hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {v.label}
+                  {locked && <Lock className="h-3 w-3 opacity-70" />}
+                </button>
+              );
+            })}
+          </nav>
+          <UserMenu />
+        </div>
       </header>
 
       <section className="relative z-10 px-4 sm:px-6 md:px-12 pt-10 md:pt-16 pb-8 text-center max-w-4xl mx-auto">
