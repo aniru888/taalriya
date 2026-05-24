@@ -31,7 +31,7 @@ function loadSaved(): SavedTaal[] {
   }
 }
 
-export function CustomTaalCreator() {
+export function CustomTaalCreator({ tier = "free" }: { tier?: "free" | "premium" } = {}) {
   const [library, setLibrary] = useState<BolMeta[]>([]);
   const [name, setName] = useState("My Taal");
   const [cells, setCells] = useState<Cell[]>(

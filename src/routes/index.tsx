@@ -8,6 +8,7 @@ import { CustomTaalCreator } from "@/components/CustomTaalCreator";
 import { SoundLibrary } from "@/components/SoundLibrary";
 import { TanpuraPanel } from "@/components/TanpuraPanel";
 import { UserMenu } from "@/components/UserMenu";
+import { PremiumLock } from "@/components/PremiumLock";
 import {
   playByName, subscribeLibrary, getLibrary, findByName,
   setTablaSemitones,
