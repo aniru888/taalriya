@@ -305,9 +305,17 @@ function Home() {
         )}
 
         {view === "tanpura" && (
-          <TanpuraPanel scale={tanpuraScale} onScaleChange={setTanpuraScale} />
+          tier === "premium" ? (
+            <TanpuraPanel scale={tanpuraScale} onScaleChange={setTanpuraScale} />
+          ) : (
+            <PremiumLock
+              title="Tanpura is a Premium feature"
+              body="Drone your sa with a custom-pitched tanpura that follows your scale. Sign in and upgrade to unlock continuous looping with smooth scale shifting."
+              isSignedIn={Boolean(user)}
+            />
+          )
         )}
-        {view === "custom" && <CustomTaalCreator />}
+        {view === "custom" && <CustomTaalCreator tier={tier} />}
         {view === "sounds" && <SoundLibrary />}
       </div>
 
