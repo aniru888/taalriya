@@ -31,7 +31,7 @@ function loadSaved(): SavedTaal[] {
   }
 }
 
-export function CustomTaalCreator() {
+export function CustomTaalCreator({ tier = "free" }: { tier?: "free" | "premium" } = {}) {
   const [library, setLibrary] = useState<BolMeta[]>([]);
   const [name, setName] = useState("My Taal");
   const [cells, setCells] = useState<Cell[]>(
@@ -114,7 +114,11 @@ export function CustomTaalCreator() {
   const removeCell = () => setCells((cs) => (cs.length > 1 ? cs.slice(0, -1) : cs));
   const clearAll = () => setCells((cs) => cs.map(() => ({ bolId: null })));
 
+  const FREE_LIMIT = 3;
+  const atLimit = tier === "free" && saved.length >= FREE_LIMIT;
+
   const save = () => {
+    if (atLimit) return;
     const item: SavedTaal = {
       id: crypto.randomUUID(),
       name: name.trim() || "Untitled Taal",
@@ -222,11 +226,18 @@ export function CustomTaalCreator() {
           </button>
           <button
             onClick={save}
-            className="inline-flex items-center gap-2 rounded-full bg-[color:var(--gold)] px-4 py-2 text-sm font-medium text-[color:var(--primary-foreground)] glow-gold hover:brightness-110 transition"
+            disabled={atLimit}
+            title={atLimit ? `Free tier saves up to ${FREE_LIMIT} taals. Upgrade for unlimited.` : "Save composition"}
+            className="inline-flex items-center gap-2 rounded-full bg-[color:var(--gold)] px-4 py-2 text-sm font-medium text-[color:var(--primary-foreground)] glow-gold hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" /> Save
           </button>
         </div>
+        {atLimit && (
+          <div className="-mt-2 mb-3 text-xs text-muted-foreground">
+            <span className="text-gold">Free tier</span> saves up to {FREE_LIMIT} taals — upgrade to Premium for unlimited compositions and cloud sync.
+          </div>
+        )}
 
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Timeline</p>
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">

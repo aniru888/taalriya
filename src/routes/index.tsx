@@ -1,18 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { Crown, Lock } from "lucide-react";
 import tablasHero from "@/assets/tablas-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 import { TaalPlayer } from "@/components/TaalPlayer";
 import { CustomTaalCreator } from "@/components/CustomTaalCreator";
 import { SoundLibrary } from "@/components/SoundLibrary";
 import { TanpuraPanel } from "@/components/TanpuraPanel";
+import { UserMenu } from "@/components/UserMenu";
+import { PremiumLock } from "@/components/PremiumLock";
 import {
   playByName, subscribeLibrary, getLibrary, findByName,
-  setTablaSemitones, getTablaSemitones,
+  setTablaSemitones,
 } from "@/lib/tabla-audio";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
 import { type Scale, setTanpuraVolume } from "@/lib/tanpura";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import { useAuth } from "@/hooks/useAuth";
+import { pullProfileIntoLocal, schedulePush, fetchProfile } from "@/lib/cloud-sync";
 import type { Step } from "@/components/TaalPlayer";
 
 export const Route = createFileRoute("/")({
@@ -31,9 +36,9 @@ export const Route = createFileRoute("/")({
 
 type View = "taals" | "custom" | "sounds" | "tanpura";
 
-const VIEWS: { id: View; label: string }[] = [
+const VIEWS: { id: View; label: string; premium?: boolean }[] = [
   { id: "taals", label: "Practice" },
-  { id: "tanpura", label: "Tanpura" },
+  { id: "tanpura", label: "Tanpura", premium: true },
   { id: "custom", label: "Custom Taal" },
   { id: "sounds", label: "Sounds" },
 ];
@@ -50,6 +55,8 @@ function Home() {
   const [favorites, setFavorites] = useState<string[]>(initial.favorites);
   const [tablaST, setTablaST] = useState(initial.tablaSemitones);
   const [tanpuraScale, setTanpuraScale] = useState<Scale>(initial.tanpuraScale as Scale);
+  const { user } = useAuth();
+  const [tier, setTier] = useState<"free" | "premium">("free");
 
   // Hydrate audio engine with saved settings on mount
   useEffect(() => {
@@ -57,15 +64,33 @@ function Home() {
     setTanpuraVolume(initial.tanpuraVolume);
   }, [initial.tablaSemitones, initial.tanpuraVolume]);
 
-  // Persist when these change
-  useEffect(() => { saveSettings({ taalId: activeTaalId }); }, [activeTaalId]);
-  useEffect(() => { saveSettings({ variation }); }, [variation]);
-  useEffect(() => { saveSettings({ favorites }); }, [favorites]);
+  // Cloud sync: pull on sign-in, push on changes (premium gates writes)
+  useEffect(() => {
+    if (!user) { setTier("free"); return; }
+    pullProfileIntoLocal().then((p) => {
+      if (!p) return;
+      setTier(p.tier);
+      const s = loadSettings();
+      setActiveTaalId(s.taalId);
+      setVariation((VARIATION_KEYS as readonly string[]).includes(s.variation) ? (s.variation as VariationKey) : "theka");
+      setFavorites(s.favorites);
+      setTablaST(s.tablaSemitones);
+      setTanpuraScale(s.tanpuraScale as Scale);
+    });
+  }, [user]);
+
+  const cloudSyncEnabled = Boolean(user) && tier === "premium";
+
+  // Persist when these change (+ push to cloud for premium users)
+  useEffect(() => { saveSettings({ taalId: activeTaalId }); if (cloudSyncEnabled) schedulePush(); }, [activeTaalId, cloudSyncEnabled]);
+  useEffect(() => { saveSettings({ variation }); if (cloudSyncEnabled) schedulePush(); }, [variation, cloudSyncEnabled]);
+  useEffect(() => { saveSettings({ favorites }); if (cloudSyncEnabled) schedulePush(); }, [favorites, cloudSyncEnabled]);
   useEffect(() => {
     setTablaSemitones(tablaST);
     saveSettings({ tablaSemitones: tablaST });
-  }, [tablaST]);
-  useEffect(() => { saveSettings({ tanpuraScale }); }, [tanpuraScale]);
+    if (cloudSyncEnabled) schedulePush();
+  }, [tablaST, cloudSyncEnabled]);
+  useEffect(() => { saveSettings({ tanpuraScale }); if (cloudSyncEnabled) schedulePush(); }, [tanpuraScale, cloudSyncEnabled]);
 
   const activeTaal = useMemo(
     () => TAALS.find((t) => t.id === activeTaalId) ?? TAALS[2],
@@ -121,25 +146,30 @@ function Home() {
             </div>
           </div>
         </div>
-        <nav className="glass rounded-full p-1 flex items-center gap-1 overflow-x-auto max-w-full">
-          {VIEWS.map((v) => {
-            const active = v.id === view;
-            return (
-              <button
-                key={v.id}
-                onClick={() => setView(v.id)}
-                className={[
-                  "rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition whitespace-nowrap",
-                  active
-                    ? "bg-[color:var(--gold)] text-[color:var(--primary-foreground)]"
-                    : "text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                {v.label}
-              </button>
-            );
-          })}
-        </nav>
+        <div className="flex items-center gap-2 flex-wrap">
+          <nav className="glass rounded-full p-1 flex items-center gap-1 overflow-x-auto max-w-full">
+            {VIEWS.map((v) => {
+              const active = v.id === view;
+              const locked = v.premium && tier !== "premium";
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => setView(v.id)}
+                  className={[
+                    "rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm transition whitespace-nowrap inline-flex items-center gap-1",
+                    active
+                      ? "bg-[color:var(--gold)] text-[color:var(--primary-foreground)]"
+                      : "text-muted-foreground hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {v.label}
+                  {locked && <Lock className="h-3 w-3 opacity-70" />}
+                </button>
+              );
+            })}
+          </nav>
+          <UserMenu />
+        </div>
       </header>
 
       <section className="relative z-10 px-4 sm:px-6 md:px-12 pt-10 md:pt-16 pb-8 text-center max-w-4xl mx-auto">
@@ -276,9 +306,17 @@ function Home() {
         )}
 
         {view === "tanpura" && (
-          <TanpuraPanel scale={tanpuraScale} onScaleChange={setTanpuraScale} />
+          tier === "premium" ? (
+            <TanpuraPanel scale={tanpuraScale} onScaleChange={setTanpuraScale} />
+          ) : (
+            <PremiumLock
+              title="Tanpura is a Premium feature"
+              body="Drone your sa with a custom-pitched tanpura that follows your scale. Sign in and upgrade to unlock continuous looping with smooth scale shifting."
+              isSignedIn={Boolean(user)}
+            />
+          )
         )}
-        {view === "custom" && <CustomTaalCreator />}
+        {view === "custom" && <CustomTaalCreator tier={tier} />}
         {view === "sounds" && <SoundLibrary />}
       </div>
 
