@@ -2,7 +2,7 @@ import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-ro
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import tablasHero from "@/assets/tablas-hero.jpg";
+import loginHero from "@/assets/login-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 
 export const Route = createFileRoute("/login")({
@@ -79,17 +79,18 @@ function LoginPage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background text-foreground flex items-center justify-center px-4">
+    <main className="relative min-h-screen overflow-hidden bg-background text-foreground flex items-center justify-center px-4 py-10">
       <div className="absolute inset-0 -z-10">
-        <img src={tablasHero} alt="" aria-hidden className="h-full w-full object-cover opacity-40" />
+        <img src={loginHero} alt="" aria-hidden width={1920} height={1280} className="h-full w-full object-cover" />
         <div className="absolute inset-0 vignette" />
         <div className="absolute inset-0 smoke pointer-events-none" />
         <div className="absolute inset-0 spotlight pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/55 via-background/40 to-background/85" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
       </div>
-      <DustParticles count={35} />
+      <DustParticles count={70} />
 
-      <div className="relative z-10 w-full max-w-md">
+      <div className="relative z-10 w-full max-w-md animate-fade-up">
         <Link to="/" className="flex items-center gap-3 justify-center mb-8">
           <div className="h-10 w-10 rounded-full border border-[color:var(--gold)]/40 glow-gold flex items-center justify-center">
             <span className="font-display text-gold text-lg">ॐ</span>
@@ -97,7 +98,7 @@ function LoginPage() {
           <div className="font-display text-2xl text-gold">Taalriya</div>
         </Link>
 
-        <div className="glass rounded-2xl p-7">
+        <div className="rounded-2xl p-7 border border-[color:var(--gold)]/20 bg-[color:var(--card)]/60 backdrop-blur-2xl shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.08)]">
           <h1 className="font-display text-2xl text-foreground text-center">
             {mode === "signup" ? "Begin your riyaaz" : "Welcome back"}
           </h1>
