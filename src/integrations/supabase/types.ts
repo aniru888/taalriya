@@ -14,6 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_requests: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["admin_request_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["admin_request_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["admin_request_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      library_sounds: {
+        Row: {
+          bpm: number | null
+          category: string | null
+          created_at: string
+          description: string | null
+          duration_ms: number | null
+          id: string
+          is_featured: boolean
+          kind: Database["public"]["Enums"]["library_sound_kind"]
+          name: string
+          scale: string | null
+          storage_path: string
+          taal_name: string | null
+          tags: string[]
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          bpm?: number | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          duration_ms?: number | null
+          id?: string
+          is_featured?: boolean
+          kind: Database["public"]["Enums"]["library_sound_kind"]
+          name: string
+          scale?: string | null
+          storage_path: string
+          taal_name?: string | null
+          tags?: string[]
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          bpm?: number | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          duration_ms?: number | null
+          id?: string
+          is_featured?: boolean
+          kind?: Database["public"]["Enums"]["library_sound_kind"]
+          name?: string
+          scale?: string | null
+          storage_path?: string
+          taal_name?: string | null
+          tags?: string[]
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      library_taals: {
+        Row: {
+          beats: number
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          divisions: string | null
+          id: string
+          is_featured: boolean
+          khali: number[]
+          name: string
+          sam: number
+          steps: Json
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          beats: number
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          divisions?: string | null
+          id?: string
+          is_featured?: boolean
+          khali?: number[]
+          name: string
+          sam?: number
+          steps: Json
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          beats?: number
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          divisions?: string | null
+          id?: string
+          is_featured?: boolean
+          khali?: number[]
+          name?: string
+          sam?: number
+          steps?: Json
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -50,6 +188,30 @@ export type Database = {
           tier?: Database["public"]["Enums"]["subscription_tier"]
           total_practice_ms?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -97,9 +259,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      admin_request_status: "pending" | "approved" | "rejected"
+      app_role: "owner" | "admin" | "user"
+      library_sound_kind: "bol" | "tanpura" | "taal_loop"
       subscription_tier: "free" | "premium"
     }
     CompositeTypes: {
@@ -228,6 +400,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      admin_request_status: ["pending", "approved", "rejected"],
+      app_role: ["owner", "admin", "user"],
+      library_sound_kind: ["bol", "tanpura", "taal_loop"],
       subscription_tier: ["free", "premium"],
     },
   },
