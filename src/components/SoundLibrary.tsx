@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Upload, Play, Trash2, Pencil, Check, X, Library } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Upload, Play, Trash2, Pencil, Check, X, Library, Link2 } from "lucide-react";
 import {
   addBol,
   getLibrary,
@@ -10,6 +10,8 @@ import {
   subscribeLibrary,
 } from "@/lib/tabla-audio";
 import type { BolMeta } from "@/lib/sample-store";
+import { loadSettings, saveSettings } from "@/lib/settings";
+import { TAALS } from "@/lib/taals";
 
 export function SoundLibrary() {
   const [items, setItems] = useState<BolMeta[]>([]);
