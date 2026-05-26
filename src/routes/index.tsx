@@ -105,16 +105,23 @@ function Home() {
   const [, force] = useState(0);
   useEffect(() => subscribeLibrary(() => force((n) => n + 1)), []);
 
+  // Explicit user-controlled assignment: label -> uploaded sample id.
+  // No more implicit name-matching — uploads only play when the user
+  // explicitly maps them in the Sounds tab.
+  const assignments = loadSettings().bolAssignments || {};
+  const library = getLibrary();
+  const libraryIds = new Set(library.map((b) => b.id));
+
   const presetSteps: Step[] = activeTaal[variation].map((name) => {
-    const has = Boolean(findByName(name));
-    return {
-      label: name,
-      play: has ? (t, v) => playByName(name, t, v) : null,
-    };
+    const mappedId = assignments[name];
+    const sampleId = mappedId && libraryIds.has(mappedId) ? mappedId : null;
+    return { label: name, sampleId };
   });
-  const missing = activeTaal[variation].filter((n) => n !== "-" && !findByName(n));
+  const missing = activeTaal[variation].filter(
+    (n) => n !== "-" && !(assignments[n] && libraryIds.has(assignments[n])),
+  );
   const uniqueMissing = Array.from(new Set(missing));
-  const libCount = getLibrary().length;
+  const libCount = library.length;
 
   const isFav = favorites.includes(activeTaal.id);
   const toggleFav = () =>
