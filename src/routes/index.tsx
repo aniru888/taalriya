@@ -283,18 +283,18 @@ function Home() {
 
             {libCount > 0 && uniqueMissing.length > 0 && (
               <div className="mb-4 rounded-xl border border-border bg-[color:var(--card)]/60 p-3 text-xs text-muted-foreground">
-                No bol named{" "}
+                Unassigned bols:{" "}
                 <span className="text-foreground font-display">
-                  {uniqueMissing.slice(0, 4).join(", ")}
-                  {uniqueMissing.length > 4 ? "…" : ""}
-                </span>{" "}
-                in your library — those beats will stay silent. Open Sounds to upload them.
+                  {uniqueMissing.slice(0, 6).join(", ")}
+                  {uniqueMissing.length > 6 ? "…" : ""}
+                </span>
+                . Open the <span className="text-gold">Sounds</span> tab and assign each bol to a recording so it plays back.
               </div>
             )}
             {libCount === 0 && (
               <div className="mb-4 rounded-xl border border-[color:var(--gold)]/30 bg-[color:var(--accent)]/40 p-3 text-xs text-foreground">
                 Your sound library is empty. Open the <span className="text-gold">Sounds</span> tab
-                to upload your tabla recordings, then come back to practice.
+                to upload your tabla recordings, then assign them to bols.
               </div>
             )}
 
