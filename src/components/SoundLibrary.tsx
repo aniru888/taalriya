@@ -19,7 +19,23 @@ export function SoundLibrary() {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [assignments, setAssignments] = useState<Record<string, string>>(() => loadSettings().bolAssignments || {});
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const allLabels = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of TAALS) for (const v of ["theka", "fast", "ending", "tehai"] as const) {
+      for (const b of t[v]) if (b !== "-") set.add(b);
+    }
+    return Array.from(set).sort();
+  }, []);
+
+  const setAssignment = (label: string, sampleId: string) => {
+    const next = { ...assignments };
+    if (!sampleId) delete next[label]; else next[label] = sampleId;
+    setAssignments(next);
+    saveSettings({ bolAssignments: next });
+  };
 
   useEffect(() => {
     startAudio().then(() => setItems(getLibrary()));
