@@ -191,6 +191,37 @@ export function SoundLibrary() {
           })}
         </div>
       )}
+
+      {/* Bol assignment — explicit mapping replaces the old name-match auto-bind */}
+      {items.length > 0 && (
+        <div className="mt-6 rounded-xl border border-border bg-[color:var(--card)]/60 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Link2 className="h-4 w-4 text-gold" />
+            <h3 className="font-display text-lg text-gold">Assign bols to recordings</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Uploaded recordings only play in preset taals when explicitly assigned here.
+            Unassigned bols stay silent — no more auto-attaching to random beats.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {allLabels.map((label) => (
+              <div key={label} className="flex items-center gap-2">
+                <span className="font-display text-sm text-foreground w-20 shrink-0">{label}</span>
+                <select
+                  value={assignments[label] ?? ""}
+                  onChange={(e) => setAssignment(label, e.target.value)}
+                  className="flex-1 rounded-md bg-[color:var(--input)] border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-[color:var(--gold)]/60"
+                >
+                  <option value="">— unassigned —</option>
+                  {items.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
