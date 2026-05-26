@@ -62,10 +62,10 @@ export function CustomTaalCreator({ tier = "free" }: { tier?: "free" | "premium"
   const steps: Step[] = useMemo(
     () =>
       cells.map((c) => {
-        if (!c.bolId) return { label: "", play: null };
+        if (!c.bolId) return { label: "·", sampleId: null };
         const b = libMap.get(c.bolId);
-        if (!b) return { label: "?", play: null };
-        return { label: b.name, play: (t, v) => playById(b.id, t, v) };
+        if (!b) return { label: "?", sampleId: null };
+        return { label: b.name, sampleId: b.id };
       }),
     [cells, libMap],
   );

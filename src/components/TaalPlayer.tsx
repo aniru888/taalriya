@@ -1,12 +1,39 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import * as Tone from "tone";
-import { Play, Pause, Square, Repeat, Volume2, TrendingUp, Star, Timer, Circle, X as XIcon } from "lucide-react";
-import { setMasterVolume, startAudio } from "@/lib/tabla-audio";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Play, Pause, Square, Repeat, Volume2, TrendingUp, Star, Timer, Circle, X as XIcon, Sparkles } from "lucide-react";
+import {
+  setMasterVolume,
+  startAudio,
+  startTransport,
+  stopTransport,
+  updateTransport,
+  setCompressorEnabled,
+  isCompressorEnabled,
+  type Beat,
+  type OnBeatInfo,
+} from "@/lib/tabla-audio";
 import { loadSettings, saveSettings } from "@/lib/settings";
 
+/** A single sub-event inside a beat. `play` is legacy; new code should set
+ *  `sampleId` + `offset` so the scheduler can fire it sample-accurately. */
+export interface Bol {
+  label: string;
+  sampleId?: string | null;
+  /** 0..1 position inside the beat. 0 = downbeat. */
+  offset?: number;
+  velocity?: number;
+}
+
+/** Step model. `bols` is the new shape (1..N voices per matra).
+ *  The legacy `play`/`label` pair is still accepted; we wrap it as a
+ *  single bol at offset 0 for backward compatibility. */
 export interface Step {
   label: string;
-  play: ((time: number, velocity?: number) => void) | null; // null = rest
+  /** Legacy single-voice callback. Ignored if `bols` is provided. */
+  play?: ((time: number, velocity?: number) => void) | null;
+  /** Optional sample id for the legacy single-voice path. */
+  sampleId?: string | null;
+  /** New multi-voice / subdivision shape. */
+  bols?: Bol[];
 }
 
 interface Props {
@@ -21,6 +48,23 @@ interface Props {
   onToggleFavorite?: () => void;
 }
 
+function stepToBeat(s: Step): Beat {
+  if (s.bols && s.bols.length > 0) {
+    return {
+      voices: s.bols.map((b) => ({
+        sampleId: b.sampleId ?? null,
+        offset: b.offset ?? 0,
+        velocity: b.velocity ?? 1,
+      })),
+    };
+  }
+  if (s.sampleId) {
+    return { voices: [{ sampleId: s.sampleId, offset: 0, velocity: 1 }] };
+  }
+  // Rest beat (no audible voice) — we still emit a visual tick from the engine.
+  return { voices: [] };
+}
+
 export function TaalPlayer({
   steps, title, subtitle, divisions,
   sam = 1, khali = [], taalId, isFavorite, onToggleFavorite,
@@ -31,14 +75,15 @@ export function TaalPlayer({
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
   const [currentBeat, setCurrentBeat] = useState(-1);
+  const [currentVoice, setCurrentVoice] = useState(-1);
   const [volume, setVolume] = useState(initial.volume);
+  const [compressor, setCompressor] = useState(initial.compressorEnabled);
 
   // Gradual BPM training
   const [trainOn, setTrainOn] = useState(false);
-  const [trainStep, setTrainStep] = useState(4);   // +bpm per increment
-  const [trainEvery, setTrainEvery] = useState(2); // cycles per increment
+  const [trainStep, setTrainStep] = useState(4);
+  const [trainEvery, setTrainEvery] = useState(2);
   const [trainMax, setTrainMax] = useState(180);
-  const cycleCountRef = useRef(0);
 
   // Session timer
   const [sessionMs, setSessionMs] = useState(0);
@@ -46,76 +91,90 @@ export function TaalPlayer({
   const tickRef = useRef<number | null>(null);
   const startedAtRef = useRef<number | null>(null);
 
-  const seqRef = useRef<Tone.Sequence | null>(null);
   const stepsRef = useRef(steps);
   stepsRef.current = steps;
+  const bpmRef = useRef(bpm);
+  bpmRef.current = bpm;
 
-  useEffect(() => {
-    Tone.getTransport().bpm.rampTo(bpm, 0.1);
-    saveSettings({ bpm });
-  }, [bpm]);
+  // Memoize Beat[] for the engine; recompute when step composition changes.
+  const fingerprint = useMemo(
+    () => steps.map((s) => {
+      if (s.bols && s.bols.length > 0) {
+        return s.bols.map((b) => `${b.label}@${b.offset ?? 0}#${b.sampleId ?? ""}`).join(",");
+      }
+      return `${s.label}#${s.sampleId ?? ""}`;
+    }).join("|"),
+    [steps],
+  );
+  const beats = useMemo<Beat[]>(
+    () => stepsRef.current.map(stepToBeat),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fingerprint],
+  );
 
   useEffect(() => { setMasterVolume(volume); saveSettings({ volume }); }, [volume]);
+  useEffect(() => {
+    setCompressorEnabled(compressor);
+    saveSettings({ compressorEnabled: compressor });
+  }, [compressor]);
+  useEffect(() => { saveSettings({ bpm }); }, [bpm]);
+
+  // Live BPM update (no restart, stays loop-quantized via lookahead).
+  useEffect(() => {
+    if (playing) updateTransport({ bpm });
+  }, [bpm, playing]);
+
+  // Live loop update.
+  useEffect(() => {
+    if (playing) updateTransport({ loop });
+  }, [loop, playing]);
 
   const stop = useCallback(() => {
-    Tone.getTransport().stop();
-    Tone.getTransport().cancel(0);
-    seqRef.current?.dispose();
-    seqRef.current = null;
+    stopTransport();
     setPlaying(false);
     setCurrentBeat(-1);
-    cycleCountRef.current = 0;
+    setCurrentVoice(-1);
   }, []);
 
   const start = useCallback(async () => {
     await startAudio();
-    stop();
-    if (stepsRef.current.length === 0) return;
-    Tone.getTransport().bpm.value = bpm;
-
-    const indices = stepsRef.current.map((_, i) => i);
-    const seq = new Tone.Sequence(
-      (time, idx: number) => {
-        const s = stepsRef.current[idx];
-        s?.play?.(time);
-        Tone.getDraw().schedule(() => setCurrentBeat(idx), time);
-        // cycle bookkeeping
-        if (idx === stepsRef.current.length - 1) {
-          Tone.getDraw().schedule(() => {
-            cycleCountRef.current += 1;
-            if (trainOn && cycleCountRef.current % trainEvery === 0) {
-              setBpm((b) => Math.min(trainMax, b + trainStep));
-            }
-          }, time);
-        }
-        if (!loop && idx === stepsRef.current.length - 1) {
-          Tone.getDraw().schedule(() => {
-            setTimeout(() => stop(), 60);
-          }, time + Tone.Time("4n").toSeconds());
+    stopTransport();
+    if (beats.length === 0) return;
+    setMasterVolume(volume);
+    setCompressorEnabled(compressor);
+    let cycle = 0;
+    startTransport({
+      bpm: bpmRef.current,
+      beats,
+      loop,
+      onBeat: (info: OnBeatInfo) => {
+        setCurrentBeat(info.beatIndex);
+        setCurrentVoice(info.voiceIndex);
+      },
+      onCycle: () => {
+        cycle++;
+        if (trainOn && cycle % trainEvery === 0) {
+          setBpm((b) => Math.min(trainMax, b + trainStep));
         }
       },
-      indices,
-      "4n",
-    );
-    seq.loop = loop;
-    seq.start(0);
-    seqRef.current = seq;
-    Tone.getTransport().start("+0.05");
+    });
     setPlaying(true);
-  }, [bpm, loop, stop, trainOn, trainEvery, trainStep, trainMax]);
+  }, [beats, loop, volume, compressor, trainOn, trainEvery, trainStep, trainMax]);
 
   const pause = useCallback(() => {
-    Tone.getTransport().pause();
+    // No native pause on the engine — stop and remember the position via re-start.
+    stopTransport();
     setPlaying(false);
   }, []);
 
-  const resume = useCallback(async () => {
-    await startAudio();
-    Tone.getTransport().start();
-    setPlaying(true);
-  }, []);
+  useEffect(() => () => stopTransport(), []);
 
-  useEffect(() => () => stop(), [stop]);
+  // Re-arm the transport when composition changes mid-play.
+  useEffect(() => {
+    if (!playing) return;
+    updateTransport({ beats });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fingerprint]);
 
   // Session timer ticking while playing
   useEffect(() => {
@@ -139,21 +198,13 @@ export function TaalPlayer({
 
   // Persist total accumulated practice
   useEffect(() => {
-    setTotalMs((t) => {
+    setTotalMs(() => {
       const next = initial.totalPracticeMs + sessionMs;
       saveSettings({ totalPracticeMs: next });
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionMs]);
-
-  // restart sequence if composition changes
-  const fingerprint = steps.map((s) => s.label).join("|");
-  useEffect(() => {
-    setCurrentBeat(-1);
-    if (playing) start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerprint]);
 
   // Keyboard: space play/pause, arrows for BPM
   useEffect(() => {
@@ -163,7 +214,6 @@ export function TaalPlayer({
       if (e.code === "Space") {
         e.preventDefault();
         if (playing) pause();
-        else if (currentBeat >= 0) resume();
         else start();
       } else if (e.code === "ArrowUp" || e.code === "ArrowRight") {
         e.preventDefault();
@@ -175,7 +225,7 @@ export function TaalPlayer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [playing, currentBeat, pause, resume, start]);
+  }, [playing, pause, start]);
 
   const divisionStarts = (() => {
     const set = new Set<number>([0]);
@@ -223,17 +273,20 @@ export function TaalPlayer({
         {steps.map((s, i) => {
           const active = i === currentBeat;
           const isStart = divisionStarts.has(i);
-          const isRest = !s.play;
+          const bols = s.bols && s.bols.length > 0 ? s.bols : [{ label: s.label, sampleId: s.sampleId ?? null, offset: 0 }];
+          const audible = bols.some((b) => b.sampleId);
+          const isRest = !audible && !(s.play);
           const isSam = i === samIdx;
           const isKhali = khaliSet.has(i);
+          const hasSubdivisions = bols.length > 1;
           return (
             <div
               key={i}
               className={[
-                "relative min-w-[48px] sm:min-w-[56px] md:min-w-[68px] flex-1 max-w-[100px] aspect-[5/4] rounded-xl border flex flex-col items-center justify-center transition-all duration-150",
+                "relative min-w-[48px] sm:min-w-[56px] md:min-w-[68px] flex-1 max-w-[100px] aspect-[5/4] rounded-xl border flex flex-col items-center justify-center",
                 active
                   ? "border-[color:var(--gold)] glow-gold bg-[color:var(--accent)] animate-beat"
-                  : "border-border bg-[color:var(--card)]",
+                  : "border-border bg-[color:var(--card)] transition-colors duration-75",
                 isStart && !active ? "border-[color:var(--gold)]/40" : "",
                 isKhali && !active ? "bg-[color:var(--card)]/40" : "",
               ].join(" ")}
@@ -242,31 +295,46 @@ export function TaalPlayer({
                 {i + 1}
               </span>
               {isSam && (
-                <span className="absolute top-1 right-1.5 text-[9px] sm:text-[10px] font-display text-gold">
-                  X
-                </span>
+                <span className="absolute top-1 right-1.5 text-[9px] sm:text-[10px] font-display text-gold">X</span>
               )}
               {isKhali && (
-                <span className="absolute top-1 right-1.5 text-[9px] sm:text-[10px] text-muted-foreground">
-                  o
+                <span className="absolute top-1 right-1.5 text-[9px] sm:text-[10px] text-muted-foreground">o</span>
+              )}
+              {hasSubdivisions ? (
+                <div className="flex items-center gap-0.5 px-1">
+                  {bols.map((b, bi) => {
+                    const litSub = active && currentVoice === bi;
+                    return (
+                      <span
+                        key={bi}
+                        className={[
+                          "font-display text-[10px] sm:text-xs leading-tight px-0.5 transition-colors duration-75",
+                          litSub ? "text-gold" : "text-foreground/85",
+                          !b.sampleId ? "opacity-50" : "",
+                        ].join(" ")}
+                      >
+                        {b.label || "·"}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span
+                  className={[
+                    "font-display text-xs sm:text-sm md:text-base px-1 text-center break-words leading-tight",
+                    isRest ? "text-muted-foreground/40" : "text-foreground",
+                    active ? "text-gold" : "",
+                    isKhali && !active ? "text-muted-foreground" : "",
+                  ].join(" ")}
+                >
+                  {isRest ? "·" : bols[0].label}
                 </span>
               )}
-              <span
-                className={[
-                  "font-display text-xs sm:text-sm md:text-base px-1 text-center break-words leading-tight",
-                  isRest ? "text-muted-foreground/40" : "text-foreground",
-                  active ? "text-gold" : "",
-                  isKhali && !active ? "text-muted-foreground" : "",
-                ].join(" ")}
-              >
-                {isRest ? "·" : s.label}
-              </span>
             </div>
           );
         })}
       </div>
 
-      {/* Legend */}
       {(sam || khali.length > 0) && (
         <div className="flex flex-wrap gap-3 text-[10px] uppercase tracking-wider text-muted-foreground mb-4">
           <span className="inline-flex items-center gap-1"><span className="text-gold font-display text-sm leading-none">X</span> Sam</span>
@@ -276,11 +344,10 @@ export function TaalPlayer({
         </div>
       )}
 
-      {/* Transport */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         {!playing ? (
           <button
-            onClick={currentBeat >= 0 ? resume : start}
+            onClick={start}
             className="inline-flex items-center gap-2 rounded-full bg-[color:var(--gold)] px-4 sm:px-5 py-2.5 text-sm font-medium text-[color:var(--primary-foreground)] glow-gold transition hover:brightness-110 active:scale-95"
           >
             <Play className="h-4 w-4 fill-current" /> Play
@@ -321,6 +388,18 @@ export function TaalPlayer({
         >
           <TrendingUp className="h-4 w-4" /> Trainer
         </button>
+        <button
+          onClick={() => setCompressor((v) => { const next = !v; setCompressorEnabled(next); return next; })}
+          title="Master compressor / presence EQ for tabla clarity"
+          className={[
+            "inline-flex items-center gap-2 rounded-full px-3 sm:px-4 py-2.5 text-sm font-medium border transition active:scale-95",
+            compressor
+              ? "border-[color:var(--gold)]/60 text-gold bg-[color:var(--accent)]/60"
+              : "border-border text-muted-foreground hover:text-foreground",
+          ].join(" ")}
+        >
+          <Sparkles className="h-4 w-4" /> Clarity
+        </button>
 
         <div className="flex items-center gap-3 ml-auto min-w-[180px] flex-1 md:max-w-xs">
           <span className="text-xs text-muted-foreground tabular-nums w-14">{bpm} BPM</span>
@@ -341,7 +420,6 @@ export function TaalPlayer({
         </div>
       </div>
 
-      {/* Trainer panel */}
       {trainOn && (
         <div className="mt-4 rounded-xl border border-[color:var(--gold)]/30 bg-[color:var(--accent)]/30 p-3 flex flex-wrap items-end gap-3 text-xs">
           <div>
@@ -372,7 +450,6 @@ export function TaalPlayer({
         </div>
       )}
 
-      {/* Session timer */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <Timer className="h-3.5 w-3.5" /> Session{" "}
@@ -390,6 +467,8 @@ export function TaalPlayer({
           </button>
         )}
       </div>
+      {taalId ? null : null}
+      {isCompressorEnabled() ? null : null}
     </div>
   );
 }

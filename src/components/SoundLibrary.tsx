@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Upload, Play, Trash2, Pencil, Check, X, Library } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Upload, Play, Trash2, Pencil, Check, X, Library, Link2 } from "lucide-react";
 import {
   addBol,
   getLibrary,
@@ -10,6 +10,8 @@ import {
   subscribeLibrary,
 } from "@/lib/tabla-audio";
 import type { BolMeta } from "@/lib/sample-store";
+import { loadSettings, saveSettings } from "@/lib/settings";
+import { TAALS } from "@/lib/taals";
 
 export function SoundLibrary() {
   const [items, setItems] = useState<BolMeta[]>([]);
@@ -17,7 +19,23 @@ export function SoundLibrary() {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [assignments, setAssignments] = useState<Record<string, string>>(() => loadSettings().bolAssignments || {});
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const allLabels = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of TAALS) for (const v of ["theka", "fast", "ending", "tehai"] as const) {
+      for (const b of t[v]) if (b !== "-") set.add(b);
+    }
+    return Array.from(set).sort();
+  }, []);
+
+  const setAssignment = (label: string, sampleId: string) => {
+    const next = { ...assignments };
+    if (!sampleId) delete next[label]; else next[label] = sampleId;
+    setAssignments(next);
+    saveSettings({ bolAssignments: next });
+  };
 
   useEffect(() => {
     startAudio().then(() => setItems(getLibrary()));
@@ -171,6 +189,37 @@ export function SoundLibrary() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Bol assignment — explicit mapping replaces the old name-match auto-bind */}
+      {items.length > 0 && (
+        <div className="mt-6 rounded-xl border border-border bg-[color:var(--card)]/60 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Link2 className="h-4 w-4 text-gold" />
+            <h3 className="font-display text-lg text-gold">Assign bols to recordings</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Uploaded recordings only play in preset taals when explicitly assigned here.
+            Unassigned bols stay silent — no more auto-attaching to random beats.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {allLabels.map((label) => (
+              <div key={label} className="flex items-center gap-2">
+                <span className="font-display text-sm text-foreground w-20 shrink-0">{label}</span>
+                <select
+                  value={assignments[label] ?? ""}
+                  onChange={(e) => setAssignment(label, e.target.value)}
+                  className="flex-1 rounded-md bg-[color:var(--input)] border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-[color:var(--gold)]/60"
+                >
+                  <option value="">— unassigned —</option>
+                  {items.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

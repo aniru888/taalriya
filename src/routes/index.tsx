@@ -10,7 +10,7 @@ import { TanpuraPanel } from "@/components/TanpuraPanel";
 import { UserMenu } from "@/components/UserMenu";
 import { PremiumLock } from "@/components/PremiumLock";
 import {
-  playByName, subscribeLibrary, getLibrary, findByName,
+  subscribeLibrary, getLibrary,
   setTablaSemitones,
 } from "@/lib/tabla-audio";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
@@ -105,16 +105,23 @@ function Home() {
   const [, force] = useState(0);
   useEffect(() => subscribeLibrary(() => force((n) => n + 1)), []);
 
+  // Explicit user-controlled assignment: label -> uploaded sample id.
+  // No more implicit name-matching — uploads only play when the user
+  // explicitly maps them in the Sounds tab.
+  const assignments = loadSettings().bolAssignments || {};
+  const library = getLibrary();
+  const libraryIds = new Set(library.map((b) => b.id));
+
   const presetSteps: Step[] = activeTaal[variation].map((name) => {
-    const has = Boolean(findByName(name));
-    return {
-      label: name,
-      play: has ? (t, v) => playByName(name, t, v) : null,
-    };
+    const mappedId = assignments[name];
+    const sampleId = mappedId && libraryIds.has(mappedId) ? mappedId : null;
+    return { label: name, sampleId };
   });
-  const missing = activeTaal[variation].filter((n) => n !== "-" && !findByName(n));
+  const missing = activeTaal[variation].filter(
+    (n) => n !== "-" && !(assignments[n] && libraryIds.has(assignments[n])),
+  );
   const uniqueMissing = Array.from(new Set(missing));
-  const libCount = getLibrary().length;
+  const libCount = library.length;
 
   const isFav = favorites.includes(activeTaal.id);
   const toggleFav = () =>
@@ -276,18 +283,18 @@ function Home() {
 
             {libCount > 0 && uniqueMissing.length > 0 && (
               <div className="mb-4 rounded-xl border border-border bg-[color:var(--card)]/60 p-3 text-xs text-muted-foreground">
-                No bol named{" "}
+                Unassigned bols:{" "}
                 <span className="text-foreground font-display">
-                  {uniqueMissing.slice(0, 4).join(", ")}
-                  {uniqueMissing.length > 4 ? "…" : ""}
-                </span>{" "}
-                in your library — those beats will stay silent. Open Sounds to upload them.
+                  {uniqueMissing.slice(0, 6).join(", ")}
+                  {uniqueMissing.length > 6 ? "…" : ""}
+                </span>
+                . Open the <span className="text-gold">Sounds</span> tab and assign each bol to a recording so it plays back.
               </div>
             )}
             {libCount === 0 && (
               <div className="mb-4 rounded-xl border border-[color:var(--gold)]/30 bg-[color:var(--accent)]/40 p-3 text-xs text-foreground">
                 Your sound library is empty. Open the <span className="text-gold">Sounds</span> tab
-                to upload your tabla recordings, then come back to practice.
+                to upload your tabla recordings, then assign them to bols.
               </div>
             )}
 

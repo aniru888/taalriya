@@ -1,4 +1,22 @@
-import * as Tone from "tone";
+// Thin facade over the new audio engine. Keeps the existing public API
+// stable so SoundLibrary, CustomTaalCreator, TanpuraPanel and the home
+// route keep working — and exposes the new transport / subdivision API.
+
+import {
+  ensureAudio,
+  previewSample,
+  registerSample,
+  unregisterSample,
+  setMasterVolume as engineSetVolume,
+  setSemitones as engineSetSemitones,
+  getSemitones as engineGetSemitones,
+  startTransport as engineStart,
+  stopTransport as engineStop,
+  updateTransport as engineUpdate,
+  setCompressorEnabled,
+  isCompressorEnabled,
+  hasSample,
+} from "./audio-engine";
 import {
   type BolMeta,
   getBlob,
@@ -8,81 +26,44 @@ import {
   renameBol,
 } from "./sample-store";
 
-let masterGain: GainNode | null = null;
-const buffers = new Map<string, AudioBuffer>(); // id -> buffer
 let metaCache: BolMeta[] = [];
 const listeners = new Set<() => void>();
 
-// Global tabla pitch shift in semitones (relative to recording).
-let tablaSemitones = 0;
-
-function emit() {
-  for (const l of listeners) l();
-}
+function emit() { for (const l of listeners) l(); }
 
 export function subscribeLibrary(cb: () => void) {
   listeners.add(cb);
-  return () => {
-    listeners.delete(cb);
-  };
+  return () => { listeners.delete(cb); };
 }
 
-export function getLibrary(): BolMeta[] {
-  return metaCache;
-}
-
-export function setTablaSemitones(n: number) {
-  tablaSemitones = Math.max(-12, Math.min(12, n));
-}
-
-export function getTablaSemitones() {
-  return tablaSemitones;
-}
+export function getLibrary(): BolMeta[] { return metaCache; }
 
 export async function startAudio() {
-  await Tone.start();
-  const ctx = Tone.getContext().rawContext as AudioContext;
-  if (!masterGain) {
-    masterGain = ctx.createGain();
-    masterGain.gain.value = 0.95;
-    masterGain.connect(ctx.destination);
-  }
+  await ensureAudio();
   await hydrate();
-}
-
-async function decodeBlob(blob: Blob): Promise<AudioBuffer> {
-  const ctx = Tone.getContext().rawContext as AudioContext;
-  const arr = await blob.arrayBuffer();
-  return await ctx.decodeAudioData(arr.slice(0));
 }
 
 async function hydrate() {
   metaCache = await listMeta();
-  await Promise.all(
-    metaCache.map(async (m) => {
-      if (buffers.has(m.id)) return;
-      const blob = await getBlob(m.id);
-      if (!blob) return;
-      try {
-        buffers.set(m.id, await decodeBlob(blob));
-      } catch (e) {
-        console.warn("Decode failed", m.name, e);
-      }
-    }),
-  );
+  await Promise.all(metaCache.map(async (m) => {
+    if (hasSample(m.id)) return;
+    const blob = await getBlob(m.id);
+    if (!blob) return;
+    try { await registerSample(m.id, blob); }
+    catch (e) { console.warn("Decode failed", m.name, e); }
+  }));
   emit();
 }
 
 export async function addBol(name: string, file: File): Promise<BolMeta> {
-  await startAudio();
+  await ensureAudio();
   const meta: BolMeta = {
     id: crypto.randomUUID(),
     name: name.trim() || "Untitled",
     createdAt: Date.now(),
   };
   try {
-    const buf = await decodeBlob(file);
-    buffers.set(meta.id, buf);
+    await registerSample(meta.id, file);
   } catch {
     throw new Error("Could not decode audio. Try MP3 or WAV.");
   }
@@ -100,7 +81,7 @@ export async function rename(id: string, name: string) {
 
 export async function remove(id: string) {
   await removeBol(id);
-  buffers.delete(id);
+  unregisterSample(id);
   metaCache = await listMeta();
   emit();
 }
@@ -111,37 +92,33 @@ export function findByName(name: string): BolMeta | undefined {
   return metaCache.find((m) => m.name.trim().toLowerCase() === n);
 }
 
-function fireBuffer(buf: AudioBuffer, time: number | undefined, velocity: number) {
-  const ctx = Tone.getContext().rawContext as AudioContext;
-  if (!masterGain) {
-    masterGain = ctx.createGain();
-    masterGain.gain.value = 0.95;
-    masterGain.connect(ctx.destination);
-  }
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  // Apply global pitch shift via playbackRate (preserves natural texture).
-  src.playbackRate.value = Math.pow(2, tablaSemitones / 12);
-  const g = ctx.createGain();
-  g.gain.value = Math.max(0, Math.min(1.5, velocity));
-  src.connect(g).connect(masterGain);
-  src.start(time ?? ctx.currentTime);
+export function findById(id: string): BolMeta | undefined {
+  return metaCache.find((m) => m.id === id);
 }
 
-export function playById(id: string | null | undefined, time?: number, velocity = 1) {
+export function playById(id: string | null | undefined, _time?: number, velocity = 1) {
   if (!id) return;
-  const buf = buffers.get(id);
-  if (!buf) return;
-  fireBuffer(buf, time, velocity);
+  // `_time` is accepted for legacy callers; previews always fire immediately.
+  previewSample(id, velocity);
 }
 
-export function playByName(name: string, time?: number, velocity = 1) {
+export function playByName(name: string, _time?: number, velocity = 1) {
   const m = findByName(name);
-  if (!m) return;
-  playById(m.id, time, velocity);
+  if (m) previewSample(m.id, velocity);
 }
 
-export function setMasterVolume(v: number) {
-  if (!masterGain) return;
-  masterGain.gain.value = v;
-}
+// Tabla pitch shift (semitones, global).
+export function setTablaSemitones(n: number) { engineSetSemitones(n); }
+export function getTablaSemitones() { return engineGetSemitones(); }
+
+export function setMasterVolume(v: number) { engineSetVolume(v); }
+
+// New transport API (re-exported for components)
+export {
+  engineStart as startTransport,
+  engineStop as stopTransport,
+  engineUpdate as updateTransport,
+  setCompressorEnabled,
+  isCompressorEnabled,
+};
+export type { Beat, Voice, OnBeatInfo, TransportOptions } from "./audio-engine";

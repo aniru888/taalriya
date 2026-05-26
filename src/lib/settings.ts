@@ -11,6 +11,13 @@ export interface AppSettings {
   tanpuraVolume: number;
   favorites: string[];
   totalPracticeMs: number;
+  /** Explicit map of bol label (e.g. "Dha") -> uploaded sample id.
+   *  Uploaded recordings only play in preset taals when listed here.
+   *  This replaces the old implicit name-matching that caused recordings
+   *  to attach to random beats automatically. */
+  bolAssignments: Record<string, string>;
+  /** Master compressor/limiter toggle (default on for tabla clarity). */
+  compressorEnabled: boolean;
 }
 
 const DEFAULTS: AppSettings = {
@@ -23,6 +30,8 @@ const DEFAULTS: AppSettings = {
   tanpuraVolume: 0.7,
   favorites: [],
   totalPracticeMs: 0,
+  bolAssignments: {},
+  compressorEnabled: true,
 };
 
 export function loadSettings(): AppSettings {
