@@ -10,7 +10,7 @@ import { TanpuraPanel } from "@/components/TanpuraPanel";
 import { UserMenu } from "@/components/UserMenu";
 import { PremiumLock } from "@/components/PremiumLock";
 import {
-  playByName, subscribeLibrary, getLibrary, findByName,
+  subscribeLibrary, getLibrary,
   setTablaSemitones,
 } from "@/lib/tabla-audio";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
