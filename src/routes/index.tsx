@@ -37,11 +37,11 @@ export const Route = createFileRoute("/")({
 
 type View = "taals" | "custom" | "sounds" | "tanpura";
 
-const VIEWS: { id: View; label: string; premium?: boolean }[] = [
+const BASE_VIEWS: { id: View; label: string; premium?: boolean; adminOnly?: boolean }[] = [
   { id: "taals", label: "Practice" },
   { id: "tanpura", label: "Tanpura", premium: true },
   { id: "custom", label: "Custom Taal" },
-  { id: "sounds", label: "Sounds" },
+  { id: "sounds", label: "My Sounds", adminOnly: true },
 ];
 
 function Home() {
