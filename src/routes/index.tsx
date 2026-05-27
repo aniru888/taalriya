@@ -17,6 +17,7 @@ import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/li
 import { type Scale, setTanpuraVolume } from "@/lib/tanpura";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useAuth } from "@/hooks/useAuth";
+import { useRole } from "@/hooks/useRole";
 import { pullProfileIntoLocal, schedulePush, fetchProfile } from "@/lib/cloud-sync";
 import type { Step } from "@/components/TaalPlayer";
 
