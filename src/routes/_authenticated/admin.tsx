@@ -27,6 +27,7 @@ function AdminLayout() {
     { to: "/admin/sounds", label: "Tabla Bols", icon: Drum },
     { to: "/admin/tanpura", label: "Tanpura", icon: Disc3 },
     { to: "/admin/taals", label: "Taal Loops", icon: Music2 },
+    { to: "/admin/assignments", label: "Beat Assignments", icon: SlidersHorizontal },
     ...(isOwner ? [{ to: "/admin/users", label: "Admin Management", icon: Users }] : []),
   ] as const;
 
