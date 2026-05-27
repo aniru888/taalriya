@@ -191,6 +191,56 @@ export type Database = {
         }
         Relationships: []
       }
+      taal_assignments: {
+        Row: {
+          beat_index: number
+          created_at: string
+          created_by: string | null
+          id: string
+          offset: number
+          slot_index: number
+          sound_id: string
+          taal_id: string
+          updated_at: string
+          variation: string
+          velocity: number
+        }
+        Insert: {
+          beat_index: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          offset?: number
+          slot_index?: number
+          sound_id: string
+          taal_id: string
+          updated_at?: string
+          variation?: string
+          velocity?: number
+        }
+        Update: {
+          beat_index?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          offset?: number
+          slot_index?: number
+          sound_id?: string
+          taal_id?: string
+          updated_at?: string
+          variation?: string
+          velocity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taal_assignments_sound_id_fkey"
+            columns: ["sound_id"]
+            isOneToOne: false
+            referencedRelation: "library_sounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
