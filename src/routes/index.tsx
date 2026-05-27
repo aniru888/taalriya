@@ -60,6 +60,7 @@ function Home() {
   const { isAdmin } = useRole();
   const VIEWS = useMemo(() => BASE_VIEWS.filter((v) => !v.adminOnly || isAdmin), [isAdmin]);
   const [tier, setTier] = useState<"free" | "premium">("free");
+  useEffect(() => { if (view === "sounds" && !isAdmin) setView("taals"); }, [view, isAdmin]);
 
   // Hydrate audio engine with saved settings on mount
   useEffect(() => {
