@@ -327,7 +327,7 @@ function Home() {
           )
         )}
         {view === "custom" && <CustomTaalCreator tier={tier} />}
-        {view === "sounds" && <SoundLibrary />}
+        {view === "sounds" && isAdmin && <SoundLibrary />}
       </div>
 
       <footer className="relative z-10 px-6 pb-8 text-center text-xs text-muted-foreground/70">
