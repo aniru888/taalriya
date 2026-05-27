@@ -17,6 +17,7 @@ import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminTanpuraRouteImport } from './routes/_authenticated/admin/tanpura'
 import { Route as AuthenticatedAdminTaalsRouteImport } from './routes/_authenticated/admin/taals'
 import { Route as AuthenticatedAdminSoundsRouteImport } from './routes/_authenticated/admin/sounds'
+import { Route as AuthenticatedAdminAssignmentsRouteImport } from './routes/_authenticated/admin/assignments'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -59,11 +60,18 @@ const AuthenticatedAdminSoundsRoute =
     path: '/sounds',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminAssignmentsRoute =
+  AuthenticatedAdminAssignmentsRouteImport.update({
+    id: '/assignments',
+    path: '/assignments',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/admin/assignments': typeof AuthenticatedAdminAssignmentsRoute
   '/admin/sounds': typeof AuthenticatedAdminSoundsRoute
   '/admin/taals': typeof AuthenticatedAdminTaalsRoute
   '/admin/tanpura': typeof AuthenticatedAdminTanpuraRoute
@@ -73,6 +81,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/admin/assignments': typeof AuthenticatedAdminAssignmentsRoute
   '/admin/sounds': typeof AuthenticatedAdminSoundsRoute
   '/admin/taals': typeof AuthenticatedAdminTaalsRoute
   '/admin/tanpura': typeof AuthenticatedAdminTanpuraRoute
@@ -84,6 +93,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/admin/assignments': typeof AuthenticatedAdminAssignmentsRoute
   '/_authenticated/admin/sounds': typeof AuthenticatedAdminSoundsRoute
   '/_authenticated/admin/taals': typeof AuthenticatedAdminTaalsRoute
   '/_authenticated/admin/tanpura': typeof AuthenticatedAdminTanpuraRoute
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/admin'
+    | '/admin/assignments'
     | '/admin/sounds'
     | '/admin/taals'
     | '/admin/tanpura'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/admin'
+    | '/admin/assignments'
     | '/admin/sounds'
     | '/admin/taals'
     | '/admin/tanpura'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/admin'
+    | '/_authenticated/admin/assignments'
     | '/_authenticated/admin/sounds'
     | '/_authenticated/admin/taals'
     | '/_authenticated/admin/tanpura'
@@ -184,10 +197,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSoundsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/assignments': {
+      id: '/_authenticated/admin/assignments'
+      path: '/assignments'
+      fullPath: '/admin/assignments'
+      preLoaderRoute: typeof AuthenticatedAdminAssignmentsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAssignmentsRoute: typeof AuthenticatedAdminAssignmentsRoute
   AuthenticatedAdminSoundsRoute: typeof AuthenticatedAdminSoundsRoute
   AuthenticatedAdminTaalsRoute: typeof AuthenticatedAdminTaalsRoute
   AuthenticatedAdminTanpuraRoute: typeof AuthenticatedAdminTanpuraRoute
@@ -195,6 +216,7 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAssignmentsRoute: AuthenticatedAdminAssignmentsRoute,
   AuthenticatedAdminSoundsRoute: AuthenticatedAdminSoundsRoute,
   AuthenticatedAdminTaalsRoute: AuthenticatedAdminTaalsRoute,
   AuthenticatedAdminTanpuraRoute: AuthenticatedAdminTanpuraRoute,
@@ -224,3 +246,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
