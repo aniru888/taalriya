@@ -1,7 +1,6 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import loginHero from "@/assets/login-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 
@@ -66,12 +65,11 @@ function LoginPage() {
   const handleGoogle = async () => {
     setBusy(true); setError(null);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin + search.redirect },
       });
-      if (result.error) throw result.error instanceof Error ? result.error : new Error(String(result.error));
-      if (result.redirected) return;
-      navigate({ to: search.redirect });
+      if (error) throw error;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);

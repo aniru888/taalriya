@@ -1,4 +1,4 @@
-import * as Tone from "tone";
+import { ensureAudio, getAudioContext } from "./audio-engine";
 
 // Tanpura system: upload your own recordings tagged per scale, play with
 // seamless looping. When a recording for the chosen scale isn't available,
@@ -81,12 +81,12 @@ export function subscribeTanpura(cb: () => void) {
 export function getTanpuraLibrary() { return meta; }
 
 async function decode(blob: Blob): Promise<AudioBuffer> {
-  const ctx = Tone.getContext().rawContext as AudioContext;
+  const ctx = getAudioContext();
   return await ctx.decodeAudioData((await blob.arrayBuffer()).slice(0));
 }
 
 export async function hydrateTanpura() {
-  await Tone.start();
+  await ensureAudio();
   meta = await listTanpuras();
   await Promise.all(
     meta.map(async (m) => {
@@ -100,7 +100,7 @@ export async function hydrateTanpura() {
 }
 
 export async function addTanpura(name: string, scale: Scale, file: File) {
-  await Tone.start();
+  await ensureAudio();
   const m: TanpuraMeta = {
     id: crypto.randomUUID(),
     name: name.trim() || `Tanpura ${scale}`,
@@ -149,7 +149,7 @@ let activeId: string | null = null;
 let tanpuraVolume = 0.7;
 
 function ensureOut() {
-  const ctx = Tone.getContext().rawContext as AudioContext;
+  const ctx = getAudioContext();
   if (!tanpuraOut) {
     tanpuraOut = ctx.createGain();
     tanpuraOut.gain.value = tanpuraVolume;
@@ -165,7 +165,7 @@ export function setTanpuraVolume(v: number) {
 export function getTanpuraVolume() { return tanpuraVolume; }
 
 export async function playTanpuraScale(scale: Scale) {
-  await Tone.start();
+  await ensureAudio();
   await hydrateTanpura();
   const pick = findBestForScale(scale);
   if (!pick) return false;
@@ -191,7 +191,7 @@ export async function playTanpuraScale(scale: Scale) {
 export function stopTanpura() {
   if (activeSrc) {
     try {
-      const ctx = Tone.getContext().rawContext as AudioContext;
+      const ctx = getAudioContext();
       // tiny fade-out
       const node = activeSrc;
       node.stop(ctx.currentTime + 0.08);

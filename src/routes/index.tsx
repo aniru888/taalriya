@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Crown, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import tablasHero from "@/assets/tablas-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 import { TaalPlayer } from "@/components/TaalPlayer";
@@ -8,7 +8,6 @@ import { CustomTaalCreator } from "@/components/CustomTaalCreator";
 import { SoundLibrary } from "@/components/SoundLibrary";
 import { TanpuraPanel } from "@/components/TanpuraPanel";
 import { UserMenu } from "@/components/UserMenu";
-import { PremiumLock } from "@/components/PremiumLock";
 import {
   subscribeLibrary, getLibrary,
   setTablaSemitones,
@@ -18,7 +17,7 @@ import { type Scale, setTanpuraVolume } from "@/lib/tanpura";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
-import { pullProfileIntoLocal, schedulePush, fetchProfile } from "@/lib/cloud-sync";
+import { pullProfileIntoLocal, schedulePush } from "@/lib/cloud-sync";
 import type { Step } from "@/components/TaalPlayer";
 
 export const Route = createFileRoute("/")({
@@ -39,7 +38,7 @@ type View = "taals" | "custom" | "sounds" | "tanpura";
 
 const BASE_VIEWS: { id: View; label: string; premium?: boolean; adminOnly?: boolean }[] = [
   { id: "taals", label: "Practice" },
-  { id: "tanpura", label: "Tanpura", premium: true },
+  { id: "tanpura", label: "Tanpura" },
   { id: "custom", label: "Custom Taal" },
   { id: "sounds", label: "My Sounds", adminOnly: true },
 ];
@@ -59,7 +58,6 @@ function Home() {
   const { user } = useAuth();
   const { isAdmin } = useRole();
   const VIEWS = useMemo(() => BASE_VIEWS.filter((v) => !v.adminOnly || isAdmin), [isAdmin]);
-  const [tier, setTier] = useState<"free" | "premium">("free");
   useEffect(() => { if (view === "sounds" && !isAdmin) setView("taals"); }, [view, isAdmin]);
 
   // Hydrate audio engine with saved settings on mount
@@ -68,12 +66,11 @@ function Home() {
     setTanpuraVolume(initial.tanpuraVolume);
   }, [initial.tablaSemitones, initial.tanpuraVolume]);
 
-  // Cloud sync: pull on sign-in, push on changes (premium gates writes)
+  // Cloud sync: pull on sign-in, push on changes
   useEffect(() => {
-    if (!user) { setTier("free"); return; }
+    if (!user) return;
     pullProfileIntoLocal().then((p) => {
       if (!p) return;
-      setTier(p.tier);
       const s = loadSettings();
       setActiveTaalId(s.taalId);
       setVariation((VARIATION_KEYS as readonly string[]).includes(s.variation) ? (s.variation as VariationKey) : "theka");
@@ -83,7 +80,7 @@ function Home() {
     });
   }, [user]);
 
-  const cloudSyncEnabled = Boolean(user) && tier === "premium";
+  const cloudSyncEnabled = Boolean(user);
 
   // Persist when these change (+ push to cloud for premium users)
   useEffect(() => { saveSettings({ taalId: activeTaalId }); if (cloudSyncEnabled) schedulePush(); }, [activeTaalId, cloudSyncEnabled]);
@@ -317,17 +314,9 @@ function Home() {
         )}
 
         {view === "tanpura" && (
-          tier === "premium" ? (
-            <TanpuraPanel scale={tanpuraScale} onScaleChange={setTanpuraScale} />
-          ) : (
-            <PremiumLock
-              title="Tanpura is a Premium feature"
-              body="Drone your sa with a custom-pitched tanpura that follows your scale. Sign in and upgrade to unlock continuous looping with smooth scale shifting."
-              isSignedIn={Boolean(user)}
-            />
-          )
+          <TanpuraPanel scale={tanpuraScale} onScaleChange={setTanpuraScale} />
         )}
-        {view === "custom" && <CustomTaalCreator tier={tier} />}
+        {view === "custom" && <CustomTaalCreator />}
         {view === "sounds" && isAdmin && <SoundLibrary />}
       </div>
 

@@ -92,6 +92,10 @@ export async function ensureAudio() {
   if (c.state === "suspended") await c.resume();
 }
 
+export function getAudioContext(): AudioContext {
+  return ensureCtx();
+}
+
 export function setSemitones(n: number) {
   semitones = Math.max(-12, Math.min(12, n | 0));
 }
