@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect, useLocation } from "@tanstack/react-router";
 import { myRoles } from "@/lib/admin.functions";
-import { ShieldCheck, Music2, Drum, Disc3, Users } from "lucide-react";
+import { ShieldCheck, Music2, Drum, Disc3, Users, SlidersHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
@@ -27,6 +27,7 @@ function AdminLayout() {
     { to: "/admin/sounds", label: "Tabla Bols", icon: Drum },
     { to: "/admin/tanpura", label: "Tanpura", icon: Disc3 },
     { to: "/admin/taals", label: "Taal Loops", icon: Music2 },
+    { to: "/admin/assignments", label: "Beat Assignments", icon: SlidersHorizontal },
     ...(isOwner ? [{ to: "/admin/users", label: "Admin Management", icon: Users }] : []),
   ] as const;
 

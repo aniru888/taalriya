@@ -17,6 +17,7 @@ import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/li
 import { type Scale, setTanpuraVolume } from "@/lib/tanpura";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useAuth } from "@/hooks/useAuth";
+import { useRole } from "@/hooks/useRole";
 import { pullProfileIntoLocal, schedulePush, fetchProfile } from "@/lib/cloud-sync";
 import type { Step } from "@/components/TaalPlayer";
 
@@ -36,11 +37,11 @@ export const Route = createFileRoute("/")({
 
 type View = "taals" | "custom" | "sounds" | "tanpura";
 
-const VIEWS: { id: View; label: string; premium?: boolean }[] = [
+const BASE_VIEWS: { id: View; label: string; premium?: boolean; adminOnly?: boolean }[] = [
   { id: "taals", label: "Practice" },
   { id: "tanpura", label: "Tanpura", premium: true },
   { id: "custom", label: "Custom Taal" },
-  { id: "sounds", label: "Sounds" },
+  { id: "sounds", label: "My Sounds", adminOnly: true },
 ];
 
 function Home() {
@@ -56,7 +57,10 @@ function Home() {
   const [tablaST, setTablaST] = useState(initial.tablaSemitones);
   const [tanpuraScale, setTanpuraScale] = useState<Scale>(initial.tanpuraScale as Scale);
   const { user } = useAuth();
+  const { isAdmin } = useRole();
+  const VIEWS = useMemo(() => BASE_VIEWS.filter((v) => !v.adminOnly || isAdmin), [isAdmin]);
   const [tier, setTier] = useState<"free" | "premium">("free");
+  useEffect(() => { if (view === "sounds" && !isAdmin) setView("taals"); }, [view, isAdmin]);
 
   // Hydrate audio engine with saved settings on mount
   useEffect(() => {
@@ -324,7 +328,7 @@ function Home() {
           )
         )}
         {view === "custom" && <CustomTaalCreator tier={tier} />}
-        {view === "sounds" && <SoundLibrary />}
+        {view === "sounds" && isAdmin && <SoundLibrary />}
       </div>
 
       <footer className="relative z-10 px-6 pb-8 text-center text-xs text-muted-foreground/70">

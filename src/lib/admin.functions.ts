@@ -298,3 +298,54 @@ export const demoteAdmin = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ---------- taal beat assignments (global, admin-curated) ----------
+export const listTaalAssignments = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin
+      .from("taal_assignments")
+      .select("id, taal_id, variation, beat_index, slot_index, sound_id, offset, velocity");
+    if (error) throw new Error(error.message);
+    return { assignments: data ?? [] };
+  });
+
+const AssignmentUpsertSchema = z.object({
+  taal_id: z.string().min(1).max(60),
+  variation: z.string().min(1).max(40),
+  beat_index: z.number().int().min(0).max(63),
+  slot_index: z.number().int().min(0).max(7),
+  sound_id: z.string().uuid(),
+  offset: z.number().min(0).max(0.999).default(0),
+  velocity: z.number().min(0).max(2).default(1),
+});
+
+export const upsertTaalAssignment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => AssignmentUpsertSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { data: row, error } = await supabaseAdmin
+      .from("taal_assignments")
+      .upsert(
+        { ...data, created_by: context.userId },
+        { onConflict: "taal_id,variation,beat_index,slot_index" },
+      )
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return { assignment: row };
+  });
+
+export const deleteTaalAssignment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await supabaseAdmin
+      .from("taal_assignments")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
