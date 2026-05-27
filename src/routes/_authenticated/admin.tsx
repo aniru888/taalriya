@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect, useLocation } from "@tanstack/react-router";
 import { myRoles } from "@/lib/admin.functions";
-import { ShieldCheck, Music2, Drum, Disc3, Users } from "lucide-react";
+import { ShieldCheck, Music2, Drum, Disc3, Users, SlidersHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
