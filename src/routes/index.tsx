@@ -57,6 +57,8 @@ function Home() {
   const [tablaST, setTablaST] = useState(initial.tablaSemitones);
   const [tanpuraScale, setTanpuraScale] = useState<Scale>(initial.tanpuraScale as Scale);
   const { user } = useAuth();
+  const { isAdmin } = useRole();
+  const VIEWS = useMemo(() => BASE_VIEWS.filter((v) => !v.adminOnly || isAdmin), [isAdmin]);
   const [tier, setTier] = useState<"free" | "premium">("free");
 
   // Hydrate audio engine with saved settings on mount
