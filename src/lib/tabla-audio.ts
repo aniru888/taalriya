@@ -43,8 +43,42 @@ export async function startAudio() {
   await hydrate();
 }
 
+const DEFAULT_BOLS = ["dha","dhin","na","tin","ta","ke","ge","tirakita"] as const;
+const BOOTSTRAP_KEY = "taalriya:bootstrapped";
+
+async function bootstrapDefaults() {
+  if (typeof localStorage === "undefined") return;
+  if (localStorage.getItem(BOOTSTRAP_KEY)) return;
+
+  const assignments: Record<string, string> = {};
+  for (const name of DEFAULT_BOLS) {
+    try {
+      const resp = await fetch(`/samples/${name}.wav`);
+      if (!resp.ok) continue;
+      const blob = await resp.blob();
+      const id = crypto.randomUUID();
+      const label = name[0].toUpperCase() + name.slice(1);
+      const meta: BolMeta = { id, name: label, createdAt: Date.now() };
+      await registerSample(id, blob);
+      await putBol(meta, blob);
+      assignments[label] = id;
+    } catch (e) { console.warn("Bootstrap failed for", name, e); }
+  }
+
+  const { loadSettings, saveSettings } = await import("./settings");
+  const cur = loadSettings().bolAssignments || {};
+  saveSettings({ bolAssignments: { ...cur, ...assignments } });
+  localStorage.setItem(BOOTSTRAP_KEY, "1");
+}
+
 async function hydrate() {
   metaCache = await listMeta();
+
+  if (metaCache.length === 0) {
+    await bootstrapDefaults();
+    metaCache = await listMeta();
+  }
+
   await Promise.all(metaCache.map(async (m) => {
     if (hasSample(m.id)) return;
     const blob = await getBlob(m.id);
