@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from "react";
-import { useAuth } from "./useAuth";
 import { listTaalAssignments, listLibrarySounds, getSoundPlaybackUrl } from "@/lib/admin.functions";
 import { registerSample, hasSample, ensureAudio } from "@/lib/audio-engine";
 
@@ -26,17 +25,11 @@ interface ServerStepOverride {
 }
 
 export function useServerAssignments(taalId: string, variation: string) {
-  const { user } = useAuth();
   const [overrides, setOverrides] = useState<Map<number, ServerStepOverride>>(new Map());
   const [loading, setLoading] = useState(false);
   const fetchedRef = useRef<string>("");
 
   useEffect(() => {
-    if (!user) {
-      setOverrides(new Map());
-      return;
-    }
-
     const key = `${taalId}:${variation}`;
     if (fetchedRef.current === key) return;
 
@@ -106,7 +99,7 @@ export function useServerAssignments(taalId: string, variation: string) {
 
     load();
     return () => { cancelled = true; };
-  }, [user, taalId, variation]);
+  }, [taalId, variation]);
 
   return { overrides, loading };
 }
