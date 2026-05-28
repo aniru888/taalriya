@@ -41,7 +41,7 @@ const BASE_VIEWS: { id: View; label: string; premium?: boolean; adminOnly?: bool
   { id: "taals", label: "Practice" },
   { id: "tanpura", label: "Tanpura" },
   { id: "custom", label: "Custom Taal" },
-  { id: "sounds", label: "My Sounds", adminOnly: true },
+  { id: "sounds", label: "My Sounds" },
 ];
 
 function Home() {

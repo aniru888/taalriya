@@ -87,7 +87,7 @@ export const createLibrarySound = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => SoundCreateSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+
     const { data: row, error } = await supabaseAdmin
       .from("library_sounds")
       .insert({ ...data, uploaded_by: context.userId })
@@ -101,7 +101,7 @@ export const updateLibrarySound = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => SoundUpdateSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+
     const { id, ...patch } = data;
     const { data: row, error } = await supabaseAdmin
       .from("library_sounds")
@@ -117,7 +117,7 @@ export const deleteLibrarySound = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+
     // fetch storage path first to clean up
     const { data: existing } = await supabaseAdmin
       .from("library_sounds")
@@ -144,7 +144,7 @@ export const createSignedUploadUrl = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+
     const safe = data.filename.replace(/\s+/g, "_");
     const path = `${data.kind}/${crypto.randomUUID()}-${safe}`;
     const { data: signed, error } = await supabaseAdmin.storage
@@ -324,7 +324,7 @@ export const upsertTaalAssignment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => AssignmentUpsertSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+
     const { data: row, error } = await supabaseAdmin
       .from("taal_assignments")
       .upsert(
@@ -341,7 +341,7 @@ export const deleteTaalAssignment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+
     const { error } = await supabaseAdmin
       .from("taal_assignments")
       .delete()

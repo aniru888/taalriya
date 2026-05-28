@@ -1,20 +1,15 @@
-import { createFileRoute, Link, Outlet, redirect, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { myRoles } from "@/lib/admin.functions";
 import { ShieldCheck, Music2, Drum, Disc3, Users, SlidersHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  beforeLoad: async () => {
-    try {
-      const { isAdmin } = await myRoles();
-      if (!isAdmin) throw redirect({ to: "/" });
-    } catch (e) {
-      if (e && typeof e === "object" && "isRedirect" in (e as any)) throw e;
-      throw redirect({ to: "/" });
-    }
-  },
   loader: async () => {
-    const r = await myRoles();
-    return { isOwner: r.isOwner };
+    try {
+      const r = await myRoles();
+      return { isOwner: r.isOwner };
+    } catch {
+      return { isOwner: false };
+    }
   },
   component: AdminLayout,
 });
