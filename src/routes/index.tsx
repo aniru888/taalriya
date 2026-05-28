@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Lock } from "lucide-react";
 import tablasHero from "@/assets/tablas-hero.jpg";
 import { DustParticles } from "@/components/DustParticles";
 import { TaalPlayer } from "@/components/TaalPlayer";
 import { CustomTaalCreator } from "@/components/CustomTaalCreator";
 import { SoundLibrary } from "@/components/SoundLibrary";
 import { TanpuraPanel } from "@/components/TanpuraPanel";
+import { SoundUploader } from "@/components/admin/SoundUploader";
+import { BeatAssignmentEditor } from "@/components/admin/BeatAssignmentEditor";
 import { UserMenu } from "@/components/UserMenu";
 import {
   subscribeLibrary, getLibrary,
@@ -16,7 +17,6 @@ import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/li
 import { type Scale, setTanpuraVolume } from "@/lib/tanpura";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useAuth } from "@/hooks/useAuth";
-import { useRole } from "@/hooks/useRole";
 import { pullProfileIntoLocal, schedulePush } from "@/lib/cloud-sync";
 import { useServerAssignments } from "@/hooks/useServerAssignments";
 import type { Step } from "@/components/TaalPlayer";
@@ -35,13 +35,14 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-type View = "taals" | "custom" | "sounds" | "tanpura";
+type View = "taals" | "custom" | "sounds" | "tanpura" | "studio";
 
-const BASE_VIEWS: { id: View; label: string; premium?: boolean; adminOnly?: boolean }[] = [
+const BASE_VIEWS: { id: View; label: string }[] = [
   { id: "taals", label: "Practice" },
   { id: "tanpura", label: "Tanpura" },
   { id: "custom", label: "Custom Taal" },
   { id: "sounds", label: "My Sounds" },
+  { id: "studio", label: "Studio" },
 ];
 
 function Home() {
@@ -57,10 +58,8 @@ function Home() {
   const [tablaST, setTablaST] = useState(initial.tablaSemitones);
   const [tanpuraScale, setTanpuraScale] = useState<Scale>(initial.tanpuraScale as Scale);
   const { user } = useAuth();
-  const { isAdmin } = useRole();
-  const VIEWS = useMemo(() => BASE_VIEWS.filter((v) => !v.adminOnly || isAdmin), [isAdmin]);
+  const VIEWS = BASE_VIEWS;
   const { overrides: serverOverrides } = useServerAssignments(activeTaalId, variation);
-  useEffect(() => { if (view === "sounds" && !isAdmin) setView("taals"); }, [view, isAdmin]);
 
   // Hydrate audio engine with saved settings on mount
   useEffect(() => {
@@ -167,7 +166,6 @@ function Home() {
           <nav className="glass rounded-full p-1 flex items-center gap-1 overflow-x-auto max-w-full">
             {VIEWS.map((v) => {
               const active = v.id === view;
-              const locked = v.premium && tier !== "premium";
               return (
                 <button
                   key={v.id}
@@ -180,7 +178,6 @@ function Home() {
                   ].join(" ")}
                 >
                   {v.label}
-                  {locked && <Lock className="h-3 w-3 opacity-70" />}
                 </button>
               );
             })}
@@ -326,7 +323,13 @@ function Home() {
           <TanpuraPanel scale={tanpuraScale} onScaleChange={setTanpuraScale} />
         )}
         {view === "custom" && <CustomTaalCreator />}
-        {view === "sounds" && isAdmin && <SoundLibrary />}
+        {view === "sounds" && <SoundLibrary />}
+        {view === "studio" && (
+          <div className="space-y-6">
+            <SoundUploader defaultKind="bol" />
+            <BeatAssignmentEditor />
+          </div>
+        )}
       </div>
 
       <footer className="relative z-10 px-6 pb-8 text-center text-xs text-muted-foreground/70">
