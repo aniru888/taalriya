@@ -1,11 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdmin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 // ---------- internal helpers ----------
 async function assertAdmin(userId: string) {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await (await getAdmin())
     .from("user_roles")
     .select("role")
     .eq("user_id", userId);
@@ -18,7 +22,7 @@ async function assertAdmin(userId: string) {
 }
 
 async function assertOwner(userId: string) {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await (await getAdmin())
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
@@ -32,7 +36,7 @@ async function assertOwner(userId: string) {
 export const myRoles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await (await getAdmin())
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId);
@@ -75,7 +79,7 @@ const SoundCreateSchema = z.object({
 export const listLibrarySounds = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await (await getAdmin())
       .from("library_sounds")
       .select("*")
       .order("created_at", { ascending: false });
@@ -88,7 +92,7 @@ export const createLibrarySound = createServerFn({ method: "POST" })
   .inputValidator((input) => SoundCreateSchema.parse(input))
   .handler(async ({ data, context }) => {
 
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await (await getAdmin())
       .from("library_sounds")
       .insert({ ...data, uploaded_by: context.userId })
       .select("*")
@@ -103,7 +107,7 @@ export const updateLibrarySound = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
 
     const { id, ...patch } = data;
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await (await getAdmin())
       .from("library_sounds")
       .update(patch)
       .eq("id", id)
@@ -119,15 +123,15 @@ export const deleteLibrarySound = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
 
     // fetch storage path first to clean up
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await (await getAdmin())
       .from("library_sounds")
       .select("storage_path")
       .eq("id", data.id)
       .maybeSingle();
-    const { error } = await supabaseAdmin.from("library_sounds").delete().eq("id", data.id);
+    const { error } = await (await getAdmin()).from("library_sounds").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     if (existing?.storage_path) {
-      await supabaseAdmin.storage.from("sound-library").remove([existing.storage_path]);
+      await (await getAdmin()).storage.from("sound-library").remove([existing.storage_path]);
     }
     return { ok: true };
   });
@@ -147,7 +151,7 @@ export const createSignedUploadUrl = createServerFn({ method: "POST" })
 
     const safe = data.filename.replace(/\s+/g, "_");
     const path = `${data.kind}/${crypto.randomUUID()}-${safe}`;
-    const { data: signed, error } = await supabaseAdmin.storage
+    const { data: signed, error } = await (await getAdmin()).storage
       .from("sound-library")
       .createSignedUploadUrl(path);
     if (error) throw new Error(error.message);
@@ -159,7 +163,7 @@ export const getSoundPlaybackUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ path: z.string().min(1).max(500) }).parse(input))
   .handler(async ({ data }) => {
-    const { data: signed, error } = await supabaseAdmin.storage
+    const { data: signed, error } = await (await getAdmin()).storage
       .from("sound-library")
       .createSignedUrl(data.path, 60 * 60);
     if (error) throw new Error(error.message);
@@ -174,14 +178,14 @@ export const createAdminRequest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     // prevent duplicate pending requests
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await (await getAdmin())
       .from("admin_requests")
       .select("id")
       .eq("user_id", context.userId)
       .eq("status", "pending")
       .maybeSingle();
     if (existing) return { ok: true, alreadyPending: true };
-    const { error } = await supabaseAdmin.from("admin_requests").insert({
+    const { error } = await (await getAdmin()).from("admin_requests").insert({
       user_id: context.userId,
       message: data.message ?? null,
       status: "pending",
@@ -194,7 +198,7 @@ export const listAdminRequests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertOwner(context.userId);
-    const { data: reqs, error } = await supabaseAdmin
+    const { data: reqs, error } = await (await getAdmin())
       .from("admin_requests")
       .select("*")
       .order("created_at", { ascending: false });
@@ -204,7 +208,7 @@ export const listAdminRequests = createServerFn({ method: "GET" })
     const userIds = Array.from(new Set((reqs ?? []).map((r) => r.user_id)));
     const profileMap: Record<string, { email: string | null; display_name: string | null }> = {};
     if (userIds.length) {
-      const { data: profiles } = await supabaseAdmin
+      const { data: profiles } = await (await getAdmin())
         .from("profiles")
         .select("id, email, display_name")
         .in("id", userIds);
@@ -232,7 +236,7 @@ export const reviewAdminRequest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
-    const { data: req, error: rErr } = await supabaseAdmin
+    const { data: req, error: rErr } = await (await getAdmin())
       .from("admin_requests")
       .select("user_id, status")
       .eq("id", data.id)
@@ -241,12 +245,12 @@ export const reviewAdminRequest = createServerFn({ method: "POST" })
     if (req.status !== "pending") throw new Error("Request already reviewed");
 
     if (data.approve) {
-      const { error: roleErr } = await supabaseAdmin
+      const { error: roleErr } = await (await getAdmin())
         .from("user_roles")
         .insert({ user_id: req.user_id, role: "admin", granted_by: context.userId });
       if (roleErr && !roleErr.message.includes("duplicate")) throw new Error(roleErr.message);
     }
-    const { error: updErr } = await supabaseAdmin
+    const { error: updErr } = await (await getAdmin())
       .from("admin_requests")
       .update({
         status: data.approve ? "approved" : "rejected",
@@ -262,7 +266,7 @@ export const listAdmins = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertOwner(context.userId);
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await (await getAdmin())
       .from("user_roles")
       .select("user_id, role, created_at, granted_by")
       .in("role", ["admin", "owner"])
@@ -270,7 +274,7 @@ export const listAdmins = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const userIds = Array.from(new Set((data ?? []).map((r) => r.user_id)));
     const { data: profiles } = userIds.length
-      ? await supabaseAdmin
+      ? await (await getAdmin())
           .from("profiles")
           .select("id, email, display_name")
           .in("id", userIds)
@@ -290,7 +294,7 @@ export const demoteAdmin = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
     if (data.user_id === context.userId) throw new Error("Owners cannot demote themselves");
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("user_roles")
       .delete()
       .eq("user_id", data.user_id)
@@ -303,7 +307,7 @@ export const demoteAdmin = createServerFn({ method: "POST" })
 export const listTaalAssignments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await (await getAdmin())
       .from("taal_assignments")
       .select("id, taal_id, variation, beat_index, slot_index, sound_id, offset, velocity");
     if (error) throw new Error(error.message);
@@ -325,7 +329,7 @@ export const upsertTaalAssignment = createServerFn({ method: "POST" })
   .inputValidator((input) => AssignmentUpsertSchema.parse(input))
   .handler(async ({ data, context }) => {
 
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await (await getAdmin())
       .from("taal_assignments")
       .upsert(
         { ...data, created_by: context.userId },
@@ -342,7 +346,7 @@ export const deleteTaalAssignment = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
 
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("taal_assignments")
       .delete()
       .eq("id", data.id);
