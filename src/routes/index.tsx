@@ -18,6 +18,7 @@ import { loadSettings, saveSettings } from "@/lib/settings";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { pullProfileIntoLocal, schedulePush } from "@/lib/cloud-sync";
+import { useServerAssignments } from "@/hooks/useServerAssignments";
 import type { Step } from "@/components/TaalPlayer";
 
 export const Route = createFileRoute("/")({
@@ -58,6 +59,7 @@ function Home() {
   const { user } = useAuth();
   const { isAdmin } = useRole();
   const VIEWS = useMemo(() => BASE_VIEWS.filter((v) => !v.adminOnly || isAdmin), [isAdmin]);
+  const { overrides: serverOverrides } = useServerAssignments(activeTaalId, variation);
   useEffect(() => { if (view === "sounds" && !isAdmin) setView("taals"); }, [view, isAdmin]);
 
   // Hydrate audio engine with saved settings on mount
@@ -113,13 +115,20 @@ function Home() {
   const library = getLibrary();
   const libraryIds = new Set(library.map((b) => b.id));
 
-  const presetSteps: Step[] = activeTaal[variation].map((name) => {
+  const presetSteps: Step[] = activeTaal[variation].map((name, i) => {
+    const serverHit = serverOverrides.get(i);
+    if (serverHit) {
+      return { label: name, sampleId: serverHit.sampleId, bols: [{
+        label: name, sampleId: serverHit.sampleId,
+        offset: serverHit.offset, velocity: serverHit.velocity,
+      }] };
+    }
     const mappedId = assignments[name];
     const sampleId = mappedId && libraryIds.has(mappedId) ? mappedId : null;
     return { label: name, sampleId };
   });
   const missing = activeTaal[variation].filter(
-    (n) => n !== "-" && !(assignments[n] && libraryIds.has(assignments[n])),
+    (n, i) => n !== "-" && !serverOverrides.has(i) && !(assignments[n] && libraryIds.has(assignments[n])),
   );
   const uniqueMissing = Array.from(new Set(missing));
   const libCount = library.length;
