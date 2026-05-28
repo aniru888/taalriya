@@ -12,6 +12,7 @@ import {
   getSemitones as engineGetSemitones,
   startTransport as engineStart,
   stopTransport as engineStop,
+  pauseTransport as enginePause,
   updateTransport as engineUpdate,
   setCompressorEnabled,
   isCompressorEnabled,
@@ -27,6 +28,8 @@ import {
 } from "./sample-store";
 
 let metaCache: BolMeta[] = [];
+let hydrated = false;
+let hydratePromise: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
 function emit() { for (const l of listeners) l(); }
@@ -38,9 +41,18 @@ export function subscribeLibrary(cb: () => void) {
 
 export function getLibrary(): BolMeta[] { return metaCache; }
 
+export function isLibraryLoading(): boolean { return !hydrated; }
+
+export async function hydrateLibrary(): Promise<void> {
+  if (hydrated) return;
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = hydrate().then(() => { hydrated = true; });
+  return hydratePromise;
+}
+
 export async function startAudio() {
   await ensureAudio();
-  await hydrate();
+  await hydrateLibrary();
 }
 
 const DEFAULT_BOLS = ["dha","dhin","na","tin","ta","ke","ge","tirakita"] as const;
@@ -151,6 +163,7 @@ export function setMasterVolume(v: number) { engineSetVolume(v); }
 export {
   engineStart as startTransport,
   engineStop as stopTransport,
+  enginePause as pauseTransport,
   engineUpdate as updateTransport,
   setCompressorEnabled,
   isCompressorEnabled,

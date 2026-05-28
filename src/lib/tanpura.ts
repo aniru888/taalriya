@@ -85,9 +85,30 @@ async function decode(blob: Blob): Promise<AudioBuffer> {
   return await ctx.decodeAudioData((await blob.arrayBuffer()).slice(0));
 }
 
+const TANPURA_BOOTSTRAP_KEY = "taalriya:tanpura-bootstrapped";
+
+async function bootstrapDefaultTanpura() {
+  if (typeof localStorage === "undefined") return;
+  if (localStorage.getItem(TANPURA_BOOTSTRAP_KEY)) return;
+  try {
+    const resp = await fetch("/samples/tanpura_c.wav");
+    if (!resp.ok) return;
+    const blob = await resp.blob();
+    const id = crypto.randomUUID();
+    const m: TanpuraMeta = { id, name: "Tanpura C (default)", scale: "C", createdAt: Date.now() };
+    await run(STORE_BLOBS, "readwrite", (s) => s.put(blob, id));
+    await run(STORE_META, "readwrite", (s) => s.put(m, id));
+    localStorage.setItem(TANPURA_BOOTSTRAP_KEY, "1");
+  } catch (e) { console.warn("Tanpura bootstrap failed", e); }
+}
+
 export async function hydrateTanpura() {
   await ensureAudio();
   meta = await listTanpuras();
+  if (meta.length === 0) {
+    await bootstrapDefaultTanpura();
+    meta = await listTanpuras();
+  }
   await Promise.all(
     meta.map(async (m) => {
       if (buffers.has(m.id)) return;

@@ -12,6 +12,7 @@ import { UserMenu } from "@/components/UserMenu";
 import {
   subscribeLibrary, getLibrary,
   setTablaSemitones,
+  hydrateLibrary, isLibraryLoading,
 } from "@/lib/tabla-audio";
 import { TAALS, VARIATION_KEYS, VARIATION_LABELS, type VariationKey } from "@/lib/taals";
 import { type Scale, setTanpuraVolume } from "@/lib/tanpura";
@@ -105,7 +106,9 @@ function Home() {
   );
 
   const [, force] = useState(0);
+  const [studioKey, setStudioKey] = useState(0);
   useEffect(() => subscribeLibrary(() => force((n) => n + 1)), []);
+  useEffect(() => { hydrateLibrary(); }, []);
 
   // Explicit user-controlled assignment: label -> uploaded sample id.
   // No more implicit name-matching — uploads only play when the user
@@ -163,7 +166,7 @@ function Home() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <nav className="glass rounded-full p-1 flex items-center gap-1 overflow-x-auto max-w-full">
+          <nav className="glass rounded-xl sm:rounded-full p-1 flex items-center gap-1 flex-wrap sm:flex-nowrap">
             {VIEWS.map((v) => {
               const active = v.id === view;
               return (
@@ -298,7 +301,12 @@ function Home() {
                 . Open the <span className="text-gold">Sounds</span> tab and assign each bol to a recording so it plays back.
               </div>
             )}
-            {libCount === 0 && (
+            {libCount === 0 && isLibraryLoading() && (
+              <div className="mb-4 rounded-xl border border-border bg-[color:var(--card)]/60 p-3 text-xs text-muted-foreground">
+                Loading tabla samples…
+              </div>
+            )}
+            {libCount === 0 && !isLibraryLoading() && (
               <div className="mb-4 rounded-xl border border-[color:var(--gold)]/30 bg-[color:var(--accent)]/40 p-3 text-xs text-foreground">
                 Your sound library is empty. Open the <span className="text-gold">Sounds</span> tab
                 to upload your tabla recordings, then assign them to bols.
@@ -326,8 +334,8 @@ function Home() {
         {view === "sounds" && <SoundLibrary />}
         {view === "studio" && (
           <div className="space-y-6">
-            <SoundUploader defaultKind="bol" />
-            <BeatAssignmentEditor />
+            <SoundUploader defaultKind="bol" onUploaded={() => setStudioKey(n => n + 1)} />
+            <BeatAssignmentEditor key={studioKey} />
           </div>
         )}
       </div>

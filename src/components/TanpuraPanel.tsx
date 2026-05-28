@@ -125,8 +125,9 @@ export function TanpuraPanel({ scale, onScaleChange }: Props) {
           {best.semitones === 0 ? "(exact match)" : `(pitch-shifted ${best.semitones > 0 ? "+" : ""}${best.semitones} st)`}
         </div>
       ) : (
-        <div className="mb-4 rounded-xl border border-[color:var(--gold)]/30 bg-[color:var(--accent)]/40 p-3 text-xs text-foreground">
-          No tanpura recordings yet. Upload one below to enable the drone.
+        <div className="mb-4 rounded-xl border border-[color:var(--gold)]/30 bg-[color:var(--accent)]/40 p-3 text-xs text-foreground space-y-1">
+          <p>Upload a tanpura loop below to enable the drone. One recording is enough — all 12 scales are auto-generated via pitch-shifting.</p>
+          <p className="text-muted-foreground">Tip: record a 10-30 second loop of your tanpura in any scale. MP3, WAV, or OGG.</p>
         </div>
       )}
 

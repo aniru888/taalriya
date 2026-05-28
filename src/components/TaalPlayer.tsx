@@ -5,6 +5,7 @@ import {
   startAudio,
   startTransport,
   stopTransport,
+  pauseTransport,
   updateTransport,
   setCompressorEnabled,
   isCompressorEnabled,
@@ -138,7 +139,6 @@ export function TaalPlayer({
 
   const start = useCallback(async () => {
     await startAudio();
-    stopTransport();
     if (beats.length === 0) return;
     setMasterVolume(volume);
     setCompressorEnabled(compressor);
@@ -154,7 +154,9 @@ export function TaalPlayer({
       onCycle: () => {
         cycle++;
         if (trainOn && cycle % trainEvery === 0) {
-          setBpm((b) => Math.min(trainMax, b + trainStep));
+          const next = Math.min(trainMax, bpmRef.current + trainStep);
+          updateTransport({ bpm: next });
+          setBpm(next);
         }
       },
     });
@@ -162,8 +164,7 @@ export function TaalPlayer({
   }, [beats, loop, volume, compressor, trainOn, trainEvery, trainStep, trainMax]);
 
   const pause = useCallback(() => {
-    // No native pause on the engine — stop and remember the position via re-start.
-    stopTransport();
+    pauseTransport();
     setPlaying(false);
   }, []);
 

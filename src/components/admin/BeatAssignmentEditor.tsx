@@ -192,9 +192,9 @@ export function BeatAssignmentEditor() {
           ))}
         </div>
 
-        {bolSounds.length === 0 && (
+        {!loading && bolSounds.length === 0 && (
           <div className="mt-3 rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">
-            No tabla bol recordings uploaded yet. Go to <span className="text-gold">Tabla Bols</span> to upload some first.
+            No tabla bol recordings uploaded yet. Use the uploader above to add your first recording.
           </div>
         )}
       </section>

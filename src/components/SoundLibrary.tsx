@@ -12,6 +12,7 @@ import {
 import type { BolMeta } from "@/lib/sample-store";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { TAALS } from "@/lib/taals";
+import { BolRecorder } from "./BolRecorder";
 
 export function SoundLibrary() {
   const [items, setItems] = useState<BolMeta[]>([]);
@@ -72,9 +73,13 @@ export function SoundLibrary() {
         <h2 className="font-display text-2xl text-gold">Sound Library</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-5">
-        Upload any percussion recording and give it a bol name — Dha, Dhik, Kran, Trkt, or anything
+        Record or upload any percussion sound and give it a bol name — Dha, Dhik, Kran, Trkt, or anything
         you like. Unlimited bols, fully renamable.
       </p>
+
+      <div className="mb-4">
+        <BolRecorder />
+      </div>
 
       {/* Upload row */}
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-[color:var(--card)] p-3 mb-5">

@@ -63,6 +63,7 @@ interface ActiveState {
 }
 
 let active: ActiveState | null = null;
+let paused: { beatIdx: number; cycle: number } | null = null;
 
 function ensureCtx(): AudioContext {
   if (ctx) return ctx;
@@ -110,17 +111,16 @@ export function setMasterVolume(v: number) {
 export function setCompressorEnabled(on: boolean) {
   compressorEnabled = on;
   if (!ctx || !masterGain || !compressor || !eqNode) return;
-  try {
-    masterGain.disconnect();
-    eqNode.disconnect();
-    compressor.disconnect();
-  } catch { /* noop */ }
   if (on) {
     masterGain.connect(eqNode);
     eqNode.connect(compressor);
     compressor.connect(ctx.destination);
+    try { masterGain.disconnect(ctx.destination); } catch { /* wasn't direct */ }
   } else {
     masterGain.connect(ctx.destination);
+    try { masterGain.disconnect(eqNode); } catch { /* wasn't via compressor */ }
+    try { eqNode.disconnect(); } catch { /* noop */ }
+    try { compressor.disconnect(); } catch { /* noop */ }
   }
 }
 
@@ -163,6 +163,9 @@ export async function registerSample(id: string, source: Blob | ArrayBuffer): Pr
 export function unregisterSample(id: string) {
   buffers.delete(id);
   normGain.delete(id);
+  if (active && active.opts.beats.some(b => b.voices.some(v => v.sampleId === id))) {
+    stopTransport();
+  }
 }
 
 export function hasSample(id: string) {
@@ -212,6 +215,7 @@ export function previewSample(sampleId: string, velocity = 1) {
 }
 
 export function startTransport(opts: TransportOptions): () => void {
+  const resumeFrom = paused;
   stopTransport();
   ensureAudio();
   if (!ctx) return () => {};
@@ -219,8 +223,8 @@ export function startTransport(opts: TransportOptions): () => void {
   const state: ActiveState = {
     opts,
     nextNoteTime: ctx.currentTime + 0.08,
-    beatIdx: 0,
-    cycle: 0,
+    beatIdx: resumeFrom?.beatIdx ?? 0,
+    cycle: resumeFrom?.cycle ?? 0,
     visualQueue: [],
     voiceNodes: new Set(),
     schedulerId: null,
@@ -287,25 +291,40 @@ export function startTransport(opts: TransportOptions): () => void {
   return () => stopTransport();
 }
 
-export function stopTransport() {
-  if (!active) return;
+function teardownActive(): ActiveState | null {
+  if (!active) return null;
   const s = active;
   active = null;
   if (s.schedulerId != null) window.clearInterval(s.schedulerId);
   if (s.rafId != null) cancelAnimationFrame(s.rafId);
-  // Stop any in-flight voices to avoid stacking on rapid restart.
   for (const src of s.voiceNodes) {
     try { src.stop(); src.disconnect(); } catch { /* noop */ }
   }
   s.voiceNodes.clear();
   s.visualQueue.length = 0;
+  return s;
+}
+
+export function pauseTransport() {
+  const s = teardownActive();
+  if (s) paused = { beatIdx: s.beatIdx, cycle: s.cycle };
+}
+
+export function stopTransport() {
+  paused = null;
+  teardownActive();
 }
 
 export function updateTransport(patch: Partial<Pick<TransportOptions, "bpm" | "loop">> & { beats?: Beat[] }) {
   if (!active) return;
   if (patch.bpm != null) active.opts.bpm = patch.bpm;
   if (patch.loop != null) active.opts.loop = patch.loop;
-  if (patch.beats) active.opts.beats = patch.beats;
+  if (patch.beats) {
+    active.opts.beats = patch.beats;
+    if (patch.beats.length > 0 && active.beatIdx >= patch.beats.length) {
+      active.beatIdx = active.beatIdx % patch.beats.length;
+    }
+  }
 }
 
 export function transportIsRunning() {
